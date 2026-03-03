@@ -1,0 +1,152 @@
+# Python
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+build/
+develop-eggs/
+dist/
+downloads/
+eggs/
+.eggs/
+lib/
+lib64/
+parts/
+sdist/
+var/
+wheels/
+*.egg-info/
+.installed.cfg
+*.egg
+MANIFEST
+*.log
+.env
+.venv
+env/
+venv/
+ENV/
+env.bak/
+venv.bak/
+
+# Node
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+.pnpm-debug.log*
+dist/
+.next/
+out/
+build/
+
+# IDEs
+.vscode/
+.idea/
+*.swp
+*.swo
+*~
+.DS_Store
+
+# Models and checkpoints
+*.pt
+*.pth
+*.ckpt
+*.safetensors
+*.bin
+checkpoints/
+lora_output*/
+lora_library/
+models/
+pretrained/
+Side-Step/
+LORAPRO/
+
+# Audio files
+*.wav
+*.mp3
+*.flac
+*.ogg
+*.opus
+*.m4a
+*.aac
+audio/
+songs/
+uploads/
+outputs/
+generated/
+
+# ace-step-ui generated content
+ace-step-ui/public/songs/
+ace-step-ui/public/uploads/
+ace-step-ui/public/outputs/
+ace-step-ui/public/audio/
+ace-step-ui/server/public/audio/
+
+# ACE-Step-1.5_ heavy directories
+ACE-Step-1.5_/python_embeded/
+ACE-Step-1.5_/env/
+ACE-Step-1.5_/.venv/
+ACE-Step-1.5_/venv/
+ACE-Step-1.5_/output/
+ACE-Step-1.5_/.cache/
+ACE-Step-1.5_/wandb/
+ACE-Step-1.5_/runs/
+ACE-Step-1.5_/preprocessed_tensors/
+ACE-Step-1.5_/data_audio/
+
+# Datasets
+datasets/
+preprocessed_tensors/
+data_audio/
+
+# Logs
+logs/
+*.log
+runs/
+tensorboard/
+wandb/
+
+# Tensorboard event files
+events.out.tfevents.*
+
+# Database
+*.db
+*.sqlite
+*.sqlite3
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+.cache/
+
+# OS
+Thumbs.db
+.DS_Store
+desktop.ini
+
+# Old submodule git history backups
+.git_backup/
+
+# Problematic folder with trailing space
+ACE-Step-1.5_ /
+
+# Large files
+*.zip
+*.tar
+*.tar.gz
+*.rar
+*.7z
+
+# Images (large)
+*.png
+*.jpg
+*.jpeg
+*.gif
+*.bmp
+*.webp
+*.tiff
+*.ico
+*.npy
+*.npz

@@ -1,0 +1,109 @@
+# Dependencies
+node_modules/
+server/node_modules/
+
+# Build outputs
+dist/
+dist-ssr/
+build/
+*.tsbuildinfo
+
+# Environment files
+.env
+.env.local
+.env.*.local
+*.local
+server/.env
+
+# Database (SQLite)
+server/data/*.db
+server/data/*.db-shm
+server/data/*.db-wal
+!server/data/.gitkeep
+
+# Generated audio files
+server/public/audio/*.mp3
+server/public/audio/*.flac
+server/public/audio/*.wav
+server/public/audio/*/
+!server/public/audio/.gitkeep
+
+# Reference tracks (user uploads)
+server/public/audio/reference-tracks/*
+!server/public/audio/reference-tracks/.gitkeep
+
+# User uploads
+server/public/uploads/
+
+# Logs
+logs/
+*.log
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Editor/IDE
+.vscode/*
+!.vscode/extensions.json
+.idea/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+*.swp
+*.swo
+*~
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# Vite cache
+.vite/
+
+# Cache
+.cache/
+*.cache
+
+# Test coverage
+coverage/
+
+# Temporary files
+tmp/
+temp/
+*.tmp
+
+# Demucs working files
+server/public/demucs-web/output/
+
+# Python
+__pycache__/
+*.py[cod]
+.venv/
+
+# Separated stems output
+server/public/audio/stems/
+!server/public/audio/stems/.gitkeep
+
+# LoRA weights (large binary files)
+lora_library/
+lora_output*/
+
+# Misc
+ComfyUI/
+comfyui/
+ACE-Step-1.5/
+
+# External editors (wavacity is 184MB - clone separately if needed)
+wavacity-editor/
+
+# Script logs
+logs/
+
+# Secrets / tokens
+*.pem
+*.key
+jwt_secret.txt

@@ -1,0 +1,79 @@
+[project]
+name = "ace-step"
+version = "1.5.0"
+description = "ACE-Step 1.5"
+readme = "README.md"
+requires-python = "==3.11.*"
+license = {text = "MIT"}
+dependencies = [
+    # PyTorch for Windows with CUDA 12.8
+    "torch==2.7.1; sys_platform == 'win32'",
+    "torchvision; sys_platform == 'win32'",
+    "torchaudio==2.7.1; sys_platform == 'win32'",
+    # PyTorch for Linux with CUDA 12.8
+    "torch==2.10.0; sys_platform == 'linux'",
+    "torchvision; sys_platform == 'linux'",
+    "torchaudio==2.10.0; sys_platform == 'linux'",
+    # PyTorch for macOS (CPU / MPS)
+    "torch>=2.9.1; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "torchvision; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "torchaudio>=2.9.1; sys_platform == 'darwin' and platform_machine == 'arm64'",
+    # Common dependencies
+    "transformers>=4.51.0,<4.58.0",
+    "diffusers",
+    "gradio",
+    "matplotlib>=3.7.5",
+    "scipy>=1.10.1",
+    "soundfile>=0.13.1",
+    "loguru>=0.7.3",
+    "einops>=0.8.1",
+    "accelerate>=1.12.0",
+    "fastapi>=0.110.0",
+    "diskcache",
+    "uvicorn[standard]>=0.27.0",
+    "numba>=0.63.1",
+    "vector-quantize-pytorch>=1.27.15",
+    "torchcodec>=0.9.1; sys_platform != 'darwin'",
+    # Local third-party packages
+    "nano-vllm; sys_platform != 'darwin'",
+    "modelscope"
+]
+
+[[tool.uv.index]]
+name = "pytorch-cu128"
+url = "https://download.pytorch.org/whl/cu128"
+explicit = true
+
+[tool.uv]
+required-environments = [
+    "sys_platform == 'darwin' and platform_machine == 'arm64'",
+    "sys_platform == 'linux' and platform_machine == 'x86_64'",
+    "sys_platform == 'win32' and platform_machine == 'AMD64'",
+]
+
+[tool.uv.sources]
+nano-vllm = { path = "acestep/third_parts/nano-vllm" }
+torch = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
+torchvision = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
+torchaudio = [
+    { index = "pytorch-cu128", marker = "sys_platform == 'win32' or sys_platform == 'linux'" },
+]
+
+[project.scripts]
+acestep = "acestep.acestep_v15_pipeline:main"
+acestep-api = "acestep.api_server:main"
+acestep-download = "acestep.model_downloader:main"
+
+[build-system]
+requires = ["hatchling"]
+build-backend = "hatchling.build"
+
+[dependency-groups]
+dev = []
+
+[tool.hatch.build.targets.wheel]
+packages = ["acestep"]

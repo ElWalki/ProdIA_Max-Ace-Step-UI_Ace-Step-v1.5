@@ -1,0 +1,223 @@
+"""
+Business Logic Handler
+Encapsulates all data processing and business logic as a bridge between model and UI
+"""
+import os
+
+# Disable tokenizers parallelism to avoid fork warning
+os.environ["TOKENIZERS_PARALLELISM"] = "false"
+
+import math
+from copy import deepcopy
+import tempfile
+import traceback
+import re
+import random
+import uuid
+import hashlib
+import json
+from contextlib import contextmanager
+from typing import Optional, Dict, Any, Tuple, List, Union
+
+import torch
+import torchaudio
+import soundfile as sf
+import time
+from tqdm import tqdm
+from loguru import logger
+import warnings
+
+from transformers import AutoTokenizer, AutoModel, AutoModelForCausalLM
+from transformers.generation.streamers import BaseStreamer
+from diffusers.models import AutoencoderOobleck
+from acestep.model_downloader import (
+    ensure_main_model,
+    ensure_dit_model,
+    check_main_model_exists,
+    check_model_exists,
+    get_checkpoints_dir,
+)
+from acestep.constants import (
+    TASK_INSTRUCTIONS,
+    SFT_GEN_PROMPT,
+    DEFAULT_DIT_INSTRUCTION,
+)
+from acestep.dit_alignment_score import MusicStampsAligner, MusicLyricScorer
+from acestep.gpu_config import get_gpu_memory_gb
+
+
+warnings.filterwarnings("ignore")
+
+
+class AceStepHandler:
+    """ACE-Step Business Logic Handler"""
+    
+    def __init__(self):
+        self.model = None
+        self.config = None
+        self.device = "cpu"
+        self.dtype = torch.float32  # Will be set based on device in initialize_service
+
+        # VAE for audio encoding/decoding
+        self.vae = None
+        
+        # Text encoder and tokenizer
+        self.text_encoder = None
+        self.text_tokenizer = None
+        
+        # Silence latent for initialization
+        self.silence_latent = None
+        
+        # Sample rate
+        self.sample_rate = 48000
+        
+        # Reward model (temporarily disabled)
+        self.reward_model = None
+        
+        # Batch size
+        self.batch_size = 2
+        
+        # Custom layers config
+        self.custom_layers_config = {2: [6], 3: [10, 11], 4: [3], 5: [8, 9], 6: [8]}
+        self.offload_to_cpu = False
+        self.offload_dit_to_cpu = False
+        self.current_offload_cost = 0.0
+        
+        # LoRA state
+        self.lora_loaded = False
+        self.use_lora = False
+        self.lora_scale = 1.0  # LoRA influence scale (0-1)
+        self._base_decoder = None  # Backup of original decoder
+        self._acestep_checkpoint_path = None  # Path to the current model checkpoint
+        self._current_lora_path = None  # Path to the currently loaded LoRA
+        self._current_lora_metadata = {}  # Metadata of the currently loaded LoRA
+    
+    def get_available_checkpoints(self) -> str:
+        """Return project root directory path"""
+        # Get project root (handler.py is in acestep/, so go up two levels to project root)
+        project_root = self._get_project_root()
+        # default checkpoints
+        checkpoint_dir = os.path.join(project_root, "checkpoints")
+        if os.path.exists(checkpoint_dir):
+            return [checkpoint_dir]
+        else:
+            return []
+    
+    def get_available_acestep_v15_models(self) -> List[str]:
+        """Scan and return all model directory names starting with 'acestep-v15-'"""
+        # Get project root
+        project_root = self._get_project_root()
+        checkpoint_dir = os.path.join(project_root, "checkpoints")
+        
+        models = []
+        if os.path.exists(checkpoint_dir):
+            # Scan all directories starting with 'acestep-v15-' in checkpoints folder
+            for item in os.listdir(checkpoint_dir):
+                item_path = os.path.join(checkpoint_dir, item)
+                if os.path.isdir(item_path) and item.startswith("acestep-v15-"):
+                    models.append(item)
+        
+        # Sort by name
+        models.sort()
+        return models
+    
+    def is_flash_attention_available(self) -> bool:
+        """Check if flash attention is available on the system"""
+        try:
+            import flash_attn
+            return True
+        except ImportError:
+            return False
+    
+    def is_turbo_model(self) -> bool:
+        """Check if the currently loaded model is a turbo model"""
+        if self.config is None:
+            return False
+        return getattr(self.config, 'is_turbo', False)
+    
+    def _read_lora_metadata(self, lora_path: str) -> Dict[str, Any]:
+        """Read LoRA adapter metadata from adapter_config.json and lora_metadata.json.
+        
+        Returns dict with keys: base_model, target_modules, rank, alpha, trigger_tag, etc.
+        """
+        metadata = {}
+        
+        # Read adapter_config.json
+        config_file = os.path.join(lora_path, "adapter_config.json")
+        if os.path.exists(config_file):
+            try:
+                with open(config_file, 'r', encoding='utf-8') as f:
+                    adapter_cfg = json.load(f)
+                metadata["base_model"] = adapter_cfg.get("base_model_name_or_path", None)
+                metadata["target_modules"] = adapter_cfg.get("target_modules", [])
+                metadata["rank"] = adapter_cfg.get("r", 0)
+                metadata["alpha"] = adapter_cfg.get("lora_alpha", 0)
+                metadata["dropout"] = adapter_cfg.get("lora_dropout", 0)
+            except Exception as e:
+                logger.warning(f"Could not read adapter_config.json: {e}")
+        
+        # Read lora_metadata.json (custom file with trigger tag etc.)
+        meta_file = os.path.join(lora_path, "lora_metadata.json")
+        if os.path.exists(meta_file):
+            try:
+                with open(meta_file, 'r', encoding='utf-8') as f:
+                    lora_meta = json.load(f)
+                metadata["trigger_tag"] = lora_meta.get("trigger_tag", "")
+                metadata["tag_position"] = lora_meta.get("tag_position", "prepend")
+                metadata["description"] = lora_meta.get("description", "")
+            except Exception as e:
+                logger.warning(f"Could not read lora_metadata.json: {e}")
+        
+        return metadata
+    
+    def _check_lora_base_model_compatibility(self, lora_path: str) -> Tuple[bool, str]:
+        """Check if the LoRA adapter's base model matches the current model.
+        
+        Returns:
+            (is_compatible, warning_message)
+        """
+        metadata = self._read_lora_metadata(lora_path)
+        base_model = metadata.get("base_model")
+        
+        if not base_model:
+            return True, ""  # No base model info, assume compatible
+        
+        # Extract model name from path (e.g., "acestep-v15-turbo" from full path)
+        base_model_name = os.path.basename(base_model.rstrip("/\\"))
+        
+        # Get current model name from config
+        current_model_name = ""
+        if hasattr(self, 'config') and self.config is not None:
+            # Try to identify current model from the config path or model_version
+            if hasattr(self.config, 'model_version'):
+                current_model_name = f"acestep-v15-{self.config.model_version}"
+            elif hasattr(self.config, 'is_turbo'):
+                current_model_name = "acestep-v15-turbo" if self.config.is_turbo else "acestep-v15-base/sft"
+        
+        # Also check from the checkpoint path used during init
+        if hasattr(self, '_acestep_checkpoint_path') and self._acestep_checkpoint_path:
+            current_model_name = os.path.basename(self._acestep_checkpoint_path.rstrip("/\\"))
+        
+        if not current_model_name:
+            return True, ""  # Can't determine current model
+        
+        # Check compatibility
+        is_turbo_lora = "turbo" in base_model_name.lower()
+        is_turbo_current = "turbo" in current_model_name.lower()
+        
+        if is_turbo_lora != is_turbo_current:
+            warning = (
+                f"⚠️ INCOMPATIBLE: This LoRA was trained on '{base_model_name}' "
+                f"but the current model is '{current_model_name}'. "
+                f"Results may be poor or identical to base model."
+            )
+            return False, warning
+        
+        if base_model_name.lower() != current_model_name.lower():
+            warning = (
+                f"⚠️ Model mismatch: LoRA trained on '{base_model_name}', "
+                f"current model is '{current_model_name}'. Results may vary."
+            )
+            return False, warning
+        
+        return True, ""

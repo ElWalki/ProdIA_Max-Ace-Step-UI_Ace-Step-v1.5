@@ -1,0 +1,5 @@
+{
+  "name": "Suno Clone UI",
+  "description": "A high-fidelity recreation of the Suno AI music generation interface using React, Tailwind CSS, and Gemini for lyric generation.",
+  "requestFramePermissions": []
+}

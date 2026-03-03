@@ -1,0 +1,5 @@
+node_modules/
+dist/
+!audio-editor/dist/
+.env
+*.log

@@ -1,0 +1,125 @@
+<h1 align="center">🎛️ ProdIA-MAX</h1>
+
+<p align="center">
+  <strong>Enhanced fork of ACE-Step UI — AI Music Production Suite for Windows</strong><br>
+  <em>Fork mejorado de ACE-Step UI — Suite de producción musical con IA para Windows</em>
+</p>
+
+<p align="center">
+  <img src="https://img.shields.io/badge/Version-0.1.0-blue?style=flat-square" alt="Version">
+  <img src="https://img.shields.io/badge/License-MIT-green?style=flat-square" alt="MIT License">
+  <img src="https://img.shields.io/badge/Platform-Windows-0078D6?style=flat-square&logo=windows" alt="Windows">
+  <img src="https://img.shields.io/badge/ACE--Step-1.5-purple?style=flat-square" alt="ACE-Step 1.5">
+</p>
+
+---
+
+## 🙏 Credits / Créditos
+
+> **ProdIA-MAX is a fork and extension of [ACE-Step UI](https://github.com/fspecii/ace-step-ui) by [fspecii](https://github.com/fspecii).**  
+> All original UI code, architecture, and design belong to their respective authors.  
+> This project adds Windows-specific tooling and production-focused enhancements on top of their work.
+
+> **ProdIA-MAX es un fork y extensión de [ACE-Step UI](https://github.com/fspecii/ace-step-ui) creado por [fspecii](https://github.com/fspecii).**  
+> Todo el código UI original, arquitectura y diseño pertenecen a sus respectivos autores.  
+> Este proyecto añade herramientas optimizadas para Windows y mejoras orientadas a producción musical.
+
+| Component | Author | License | Link |
+|-----------|--------|---------|------|
+| **ACE-Step UI** (base UI) | [fspecii](https://github.com/fspecii) | MIT | [github.com/fspecii/ace-step-ui](https://github.com/fspecii/ace-step-ui) |
+| **ACE-Step 1.5** (AI model) | [ACE-Step Team](https://github.com/ace-step) | MIT | [github.com/ace-step/ACE-Step-1.5](https://github.com/ace-step/ACE-Step-1.5) |
+| **ProdIA-MAX** (this fork) | [ElWalki](https://github.com/ElWalki) | MIT | — |
+
+---
+
+## 🚀 What is ProdIA-MAX? / ¿Qué es ProdIA-MAX?
+
+**EN:** ProdIA-MAX is a Windows-optimized fork of ACE-Step UI that bundles extra production tools: BPM/key detection, automatic lyric transcription, vocal/instrumental separation, LoRA training preparation, and one-click launchers — all wired to the ACE-Step 1.5 AI music generation engine.
+
+**ES:** ProdIA-MAX es un fork de ACE-Step UI optimizado para Windows que incluye herramientas extra de producción: detección de BPM y tonalidad, transcripción automática de letras, separación vocal/instrumental, preparación para entrenamiento LoRA y lanzadores con un solo clic — todo integrado con el motor de generación musical IA ACE-Step 1.5.
+
+---
+
+## ✨ MAX Additions / Añadidos MAX
+
+| Feature | Status | Description |
+|---------|--------|-------------|
+| **Vocal Separation (Demucs)** | ✅ Beta | Separate vocals/instrumental from any song |
+| **Vocal Reference Tab** | ✅ | Dedicated vocal reference panel |
+| **Independent Audio Strengths** | ✅ | Separate reference + source strength sliders |
+| **Audio Metadata Tagging** | ✅ | ID3 tags (title, artist, BPM, key) in MP3s |
+| **Edit Metadata** | ✅ | Edit BPM, key, time signature, title in-app |
+| **LoRA Quick Unload** | ✅ | One-click unload on collapsed LoRA panel |
+| **Time Signature Labels** | ✅ | Proper 2/4, 3/4, 4/4, 6/8 notation |
+| **Prepare for Training** | ✅ Beta | Quick button to prep songs for LoRA training |
+| **VRAM Safety** | ✅ | Generation locked during Demucs separation |
+| **BPM & Key Detection** | ✅ | `detectar_bpm_clave.py` — batch detect BPM/key |
+| **Lyric Transcription** | ✅ | `transcribir_letras.py` — Whisper-based transcription |
+| **Caption Tools** | ✅ | Apply/truncate training captions automatically |
+| **One-click Windows launchers** | ✅ | `.bat` scripts for setup, launch, and cleanup |
+
+---
+
+## 📋 Requirements / Requisitos
+
+| Requirement | Minimum | Recommended |
+|-------------|---------|-------------|
+| OS | Windows 10 | Windows 11 |
+| GPU VRAM | 4 GB | 12 GB+ |
+| Python | 3.10 | 3.11 |
+| Node.js | 18 | 20 |
+| CUDA | — | 12.8 |
+
+---
+
+## ⚡ Quick Start / Inicio rápido (Windows)
+
+```bat
+REM 1. Setup (only first time / solo la primera vez)
+setup.bat
+
+REM 2. Launch everything / Lanzar todo
+iniciar_todo.bat
+```
+
+Open / Abre: **http://localhost:3000**
+
+---
+
+## 📁 Project Structure / Estructura del proyecto
+
+```
+ProdIA-MAX/
+├── ACE-Step-1.5_/          # ACE-Step 1.5 AI engine (original, MIT)
+├── ace-step-ui/             # Base UI fork from fspecii (original, MIT)
+├── aplicar_captions_v3.py  # MAX: Auto-apply training captions
+├── detectar_bpm_clave.py   # MAX: BPM & key detection (librosa)
+├── transcribir_letras.py   # MAX: Lyric transcription (Whisper)
+├── truncar_captions.py     # MAX: Caption truncation helper
+├── check_genres.py         # MAX: Genre validator
+├── check_tensors.py        # MAX: Tensor/model inspector
+├── setup.bat               # Windows one-click setup
+├── iniciar_todo.bat        # Windows one-click launcher
+├── verificar_modelos.bat   # Model verification
+└── limpiar_datos_usuario.bat # Clean user data
+```
+
+---
+
+## 📄 License / Licencia
+
+This project is distributed under the **MIT License**.  
+Este proyecto se distribuye bajo la **Licencia MIT**.
+
+- The original **ACE-Step UI** code remains © [fspecii](https://github.com/fspecii) under MIT.  
+- The **ACE-Step 1.5** model and backend remain © [ACE-Step Team](https://github.com/ace-step) under MIT.  
+- New additions and modifications in this fork are © [ElWalki](https://github.com/ElWalki) under MIT.
+
+See [ACE-Step-1.5_/LICENSE](ACE-Step-1.5_/LICENSE) for the full license text.
+
+---
+
+<p align="center">
+  Built on top of the amazing work of <a href="https://github.com/fspecii/ace-step-ui">fspecii</a> and the <a href="https://github.com/ace-step/ACE-Step-1.5">ACE-Step team</a>.<br>
+  <em>Stop paying for Suno. Start creating with ACE-Step.</em>
+</p>

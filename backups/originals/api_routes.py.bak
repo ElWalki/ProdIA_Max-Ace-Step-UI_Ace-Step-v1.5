@@ -1,0 +1,105 @@
+"""
+Gradio API Routes Module
+Add API endpoints compatible with api_server.py and CustomAceStep to Gradio application
+"""
+import json
+import os
+import random
+import time
+from typing import Any, Dict, List, Optional
+from uuid import uuid4
+
+from fastapi import APIRouter, HTTPException, Request, Depends, Header
+from fastapi.responses import FileResponse
+
+# API Key storage (set via setup_api_routes)
+_api_key: Optional[str] = None
+
+
+def set_api_key(key: Optional[str]):
+    """Set the API key for authentication"""
+    global _api_key
+    _api_key = key
+
+
+def _wrap_response(data: Any, code: int = 200, error: Optional[str] = None) -> Dict[str, Any]:
+    """Wrap response data in standard format compatible with CustomAceStep."""
+    return {
+        "data": data,
+        "code": code,
+        "error": error,
+        "timestamp": int(time.time() * 1000),
+        "extra": None,
+    }
+
+
+def verify_token_from_request(body: dict, authorization: Optional[str] = None) -> Optional[str]:
+    """
+    Verify API key from request body (ai_token) or Authorization header.
+    Returns the token if valid, None if no auth required.
+    """
+    if _api_key is None:
+        return None  # No auth required
+
+    # Try ai_token from body first
+    ai_token = body.get("ai_token") if body else None
+    if ai_token:
+        if ai_token == _api_key:
+            return ai_token
+        raise HTTPException(status_code=401, detail="Invalid ai_token")
+
+    # Fallback to Authorization header
+    if authorization:
+        if authorization.startswith("Bearer "):
+            token = authorization[7:]
+        else:
+            token = authorization
+        if token == _api_key:
+            return token
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+    # No token provided but auth is required
+    raise HTTPException(status_code=401, detail="Missing ai_token or Authorization header")
+
+
+async def verify_api_key(authorization: Optional[str] = Header(None)):
+    """Verify API key from Authorization header (legacy, for non-body endpoints)"""
+    if _api_key is None:
+        return  # No auth required
+
+    if not authorization:
+        raise HTTPException(status_code=401, detail="Missing Authorization header")
+
+    # Support "Bearer <key>" format
+    if authorization.startswith("Bearer "):
+        token = authorization[7:]
+    else:
+        token = authorization
+
+    if token != _api_key:
+        raise HTTPException(status_code=401, detail="Invalid API key")
+
+
+# Use diskcache to store results
+try:
+    import diskcache
+    _cache_dir = os.path.join(os.path.dirname(__file__), ".cache", "api_results")
+    os.makedirs(_cache_dir, exist_ok=True)
+    _result_cache = diskcache.Cache(_cache_dir)
+    DISKCACHE_AVAILABLE = True
+except ImportError:
+    _result_cache = {}
+    DISKCACHE_AVAILABLE = False
+
+RESULT_EXPIRE_SECONDS = 7 * 24 * 60 * 60  # 7 days expiration
+RESULT_KEY_PREFIX = "ace_step_v1.5_"
+
+# =============================================================================
+# Example Data for Random Sample
+# =============================================================================
+
+def _get_project_root() -> str:
+    """Get project root directory"""
+    return os.path.dirname(os.path.dirname(os.path.dirname(os.path.abspath(__file__))))
+
+# ... (rest of original file) ...
