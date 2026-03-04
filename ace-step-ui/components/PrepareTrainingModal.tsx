@@ -168,7 +168,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
         {/* Header */}
         <div className="flex items-center justify-between px-5 py-4 border-b border-zinc-200 dark:border-zinc-800">
           <div className="flex items-center gap-3">
-            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-pink-500 to-purple-600 flex items-center justify-center">
+            <div className="w-9 h-9 rounded-xl bg-gradient-to-br from-violet-500 to-purple-600 flex items-center justify-center">
               <Database size={18} className="text-white" />
             </div>
             <div>
@@ -206,7 +206,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
               <button
                 type="button"
                 onClick={togglePlay}
-                className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-pink-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-pink-500/20 hover:scale-105 transition-transform"
+                className="flex-shrink-0 w-10 h-10 rounded-full bg-gradient-to-br from-violet-500 to-purple-600 text-white flex items-center justify-center shadow-lg shadow-violet-500/20 hover:scale-105 transition-transform"
               >
                 {isPlaying ? <Pause size={16} /> : <Play size={16} className="ml-0.5" />}
               </button>
@@ -233,7 +233,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
               >
                 {/* Trim region highlight */}
                 <div
-                  className="absolute inset-y-0 bg-pink-500/20 dark:bg-pink-400/15 border-l-2 border-r-2 border-pink-500"
+                  className="absolute inset-y-0 bg-violet-500/20 dark:bg-violet-400/15 border-l-2 border-r-2 border-violet-500"
                   style={{
                     left: `${trimStartPercent}%`,
                     width: `${trimEndPercent - trimStartPercent}%`,
@@ -261,7 +261,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
                     step={1}
                     value={trimStart}
                     onChange={(e) => setTrimStart(Number(e.target.value))}
-                    className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
+                    className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
                   />
                   <input
                     type="number"
@@ -285,7 +285,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
                     step={1}
                     value={trimEnd || Math.ceil(audioDuration)}
                     onChange={(e) => setTrimEnd(Number(e.target.value))}
-                    className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-pink-500"
+                    className="flex-1 h-1.5 bg-zinc-200 dark:bg-zinc-700 rounded-lg appearance-none cursor-pointer accent-violet-500"
                   />
                   <input
                     type="number"
@@ -371,7 +371,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
               value={caption}
               onChange={(e) => setCaption(e.target.value)}
               placeholder="e.g. Lo-fi ambient electronic, dreamy pads, soft beats"
-              className="w-full h-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-xl p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-pink-500/30 resize-none"
+              className="w-full h-20 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-xl p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 resize-none"
             />
           </div>
 
@@ -383,7 +383,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
               value={genre}
               onChange={(e) => setGenre(e.target.value)}
               placeholder="e.g. electronic, ambient, lo-fi"
-              className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-pink-500/30"
+              className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
             />
           </div>
 
@@ -395,7 +395,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
               value={customTag}
               onChange={(e) => setCustomTag(e.target.value)}
               placeholder="e.g. mystyle, artist_x"
-              className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-pink-500/30"
+              className="w-full bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-xl px-3 py-2 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30"
             />
             <p className="text-[10px] text-zinc-400">This tag will be prepended to the caption during training. Use it as a trigger word for the LoRA.</p>
           </div>
@@ -412,7 +412,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
                     setIsInstrumental(e.target.checked);
                     if (e.target.checked) setLanguage('instrumental');
                   }}
-                  className="w-3.5 h-3.5 rounded border-zinc-300 text-pink-500 focus:ring-pink-500"
+                  className="w-3.5 h-3.5 rounded border-zinc-300 text-violet-500 focus:ring-violet-500"
                 />
                 <span className="text-[11px] text-zinc-500 dark:text-zinc-400">Instrumental (no lyrics)</span>
               </label>
@@ -422,7 +422,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
                 value={lyrics}
                 onChange={(e) => setLyrics(e.target.value)}
                 placeholder="Paste or type lyrics here..."
-                className="w-full h-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-xl p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-pink-500/30 resize-y font-mono"
+                className="w-full h-32 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-xl p-3 text-sm text-zinc-900 dark:text-white placeholder-zinc-400 focus:outline-none focus:ring-2 focus:ring-violet-500/30 resize-y font-mono"
               />
             )}
           </div>
@@ -498,7 +498,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
                 <button
                   type="button"
                   onClick={() => setShowNewDataset(true)}
-                  className="flex items-center gap-1 px-3 py-2 rounded-lg bg-pink-500 hover:bg-pink-600 text-white text-xs font-medium transition-colors"
+                  className="flex items-center gap-1 px-3 py-2 rounded-lg bg-violet-500 hover:bg-violet-600 text-white text-xs font-medium transition-colors"
                 >
                   <Plus size={12} /> New
                 </button>
@@ -511,7 +511,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
                   onChange={(e) => setNewDatasetName(e.target.value)}
                   placeholder="dataset_name"
                   autoFocus
-                  className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-pink-500/30"
+                  className="flex-1 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-600 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:ring-2 focus:ring-violet-500/30"
                 />
                 <button
                   type="button"
@@ -557,7 +557,7 @@ export const PrepareTrainingModal: React.FC<PrepareTrainingModalProps> = ({ song
               type="button"
               onClick={handleSubmit}
               disabled={submitting || !song.audioUrl || !effectiveDatasetName}
-              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-pink-500 to-purple-600 text-white text-sm font-semibold shadow-lg shadow-pink-500/25 hover:shadow-pink-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
+              className="flex items-center gap-2 px-5 py-2.5 rounded-xl bg-gradient-to-r from-violet-500 to-purple-600 text-white text-sm font-semibold shadow-lg shadow-violet-500/25 hover:shadow-violet-500/40 disabled:opacity-50 disabled:cursor-not-allowed transition-all"
             >
               {submitting ? (
                 <Loader2 size={16} className="animate-spin" />

@@ -331,7 +331,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
       >
         {/* Header — draggable */}
         <div
-          className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-pink-500/10 via-purple-500/10 to-blue-500/10 dark:from-pink-500/5 dark:via-purple-500/5 dark:to-blue-500/5 border-b border-zinc-200 dark:border-zinc-700 cursor-move"
+          className="flex items-center justify-between px-4 py-3 bg-gradient-to-r from-violet-500/10 via-purple-500/10 to-blue-500/10 dark:from-violet-500/5 dark:via-purple-500/5 dark:to-blue-500/5 border-b border-zinc-200 dark:border-zinc-700 cursor-move"
           onMouseDown={handleDragStart}
         >
           <div className="flex items-center gap-2">
@@ -518,7 +518,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
               placeholder="Search LoRAs..."
-              className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-[11px] text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-pink-500/30"
+              className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-[11px] text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30"
               autoComplete="off"
               spellCheck={false}
             />
@@ -541,7 +541,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
           ) : filteredLoras.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-zinc-400 dark:text-zinc-500">
               <span className="text-xs">No LoRAs found</span>
-              <button onClick={fetchList} className="text-[10px] text-pink-500 hover:underline mt-1">Refresh</button>
+              <button onClick={fetchList} className="text-[10px] text-violet-500 hover:underline mt-1">Refresh</button>
             </div>
           ) : (
             <div className="py-1">
@@ -717,7 +717,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                 step={0.05}
                 value={pendingActivation.scale}
                 onChange={(e) => setPendingActivation(prev => prev ? { ...prev, scale: parseFloat(e.target.value) } : null)}
-                className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full appearance-none cursor-pointer accent-pink-500"
+                className="w-full h-2 bg-zinc-200 dark:bg-zinc-700 rounded-full appearance-none cursor-pointer accent-violet-500"
               />
               <div className="flex justify-between text-[8px] text-zinc-400">
                 <span>0.00</span>

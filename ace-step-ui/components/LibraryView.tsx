@@ -126,28 +126,28 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                     className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'all' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                  >
                     All Songs
-                    {activeTab === 'all' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-full"></div>}
+                    {activeTab === 'all' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-full"></div>}
                  </button>
                  <button 
                     onClick={() => setActiveTab('liked')}
                     className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'liked' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                  >
                     {t('likedSongs')}
-                    {activeTab === 'liked' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-full"></div>}
+                    {activeTab === 'liked' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-full"></div>}
                  </button>
                  <button 
                     onClick={() => setActiveTab('playlists')}
                     className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'playlists' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                  >
                     {t('playlists')}
-                    {activeTab === 'playlists' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-full"></div>}
+                    {activeTab === 'playlists' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-full"></div>}
                  </button>
                  <button 
                     onClick={() => setActiveTab('uploads')}
                     className={`pb-3 text-sm font-bold transition-colors relative ${activeTab === 'uploads' ? 'text-zinc-900 dark:text-white' : 'text-zinc-500 hover:text-zinc-900 dark:hover:text-white'}`}
                  >
                     Uploads
-                    {activeTab === 'uploads' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-green-500 rounded-full"></div>}
+                    {activeTab === 'uploads' && <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-violet-500 rounded-full"></div>}
                  </button>
              </div>
 
@@ -224,7 +224,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                              </div>
                          </div>
                          <div className="ml-auto mb-2 opacity-0 group-hover:opacity-100 transition-opacity">
-                             <div className="w-14 h-14 rounded-full bg-green-500 flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
+                             <div className="w-14 h-14 rounded-full bg-violet-500 flex items-center justify-center shadow-lg hover:scale-105 transition-transform">
                                 <Play fill="black" className="text-black ml-1" size={28} />
                              </div>
                          </div>
@@ -248,7 +248,7 @@ export const LibraryView: React.FC<LibraryViewProps> = ({
                                 </div>
                                 
                                 <div className="text-zinc-500 dark:text-zinc-400 text-sm font-mono">{song.duration}</div>
-                                <div className="text-green-500"><Heart fill="#22c55e" size={16} /></div>
+                                <div className="text-violet-500"><Heart fill="#8b5cf6" size={16} /></div>
                                 <div className="relative ml-2">
                                     <button
                                         className="p-2 rounded-full hover:bg-zinc-200 dark:hover:bg-white/5 text-zinc-400 hover:text-black dark:hover:text-white transition-colors"

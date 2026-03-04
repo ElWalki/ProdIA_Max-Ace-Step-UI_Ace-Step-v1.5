@@ -254,10 +254,10 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
                             </button>
                             {isCurrentlyPlaying && (
                                 <div className="absolute bottom-4 left-4 flex items-center gap-1">
-                                    <span className="w-1.5 h-4 bg-pink-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
-                                    <span className="w-1.5 h-6 bg-pink-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
-                                    <span className="w-1.5 h-3 bg-pink-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
-                                    <span className="w-1.5 h-7 bg-pink-500 rounded-full animate-pulse" style={{ animationDelay: '450ms' }} />
+                                    <span className="w-1.5 h-4 bg-violet-500 rounded-full animate-pulse" style={{ animationDelay: '0ms' }} />
+                                    <span className="w-1.5 h-6 bg-violet-500 rounded-full animate-pulse" style={{ animationDelay: '150ms' }} />
+                                    <span className="w-1.5 h-3 bg-violet-500 rounded-full animate-pulse" style={{ animationDelay: '300ms' }} />
+                                    <span className="w-1.5 h-7 bg-violet-500 rounded-full animate-pulse" style={{ animationDelay: '450ms' }} />
                                 </div>
                             )}
                         </div>
@@ -270,7 +270,7 @@ export const SongProfile: React.FC<SongProfileProps> = ({ songId, onBack, onPlay
                             </div>
                             <button
                                 onClick={() => onToggleLike?.(song.id)}
-                                className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm transition-colors ${isLiked ? 'bg-pink-500 text-white' : 'bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white'}`}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-full text-sm transition-colors ${isLiked ? 'bg-violet-500 text-white' : 'bg-zinc-200 dark:bg-zinc-900 hover:bg-zinc-300 dark:hover:bg-zinc-800 text-zinc-900 dark:text-white'}`}
                             >
                                 <Heart size={16} className={isLiked ? 'fill-current' : ''} />
                                 <span className="font-semibold">{song.likeCount || 0}</span>

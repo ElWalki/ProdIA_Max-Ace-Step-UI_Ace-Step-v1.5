@@ -201,7 +201,7 @@ export const Player: React.FC<PlayerProps> = ({
                             </div>
                             <button
                                 onClick={onToggleLike}
-                                className={`p-2 tap-highlight-none ${isLiked ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 dark:text-white/50'}`}
+                                className={`p-2 tap-highlight-none ${isLiked ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400 dark:text-white/50'}`}
                             >
                                 <Heart size={24} fill={isLiked ? "currentColor" : "none"} />
                             </button>
@@ -232,7 +232,7 @@ export const Player: React.FC<PlayerProps> = ({
                     <div className="flex items-center justify-center gap-8 py-4">
                         <button
                             onClick={onToggleShuffle}
-                            className={`p-2 tap-highlight-none ${isShuffle ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 dark:text-white/50'}`}
+                            className={`p-2 tap-highlight-none ${isShuffle ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400 dark:text-white/50'}`}
                         >
                             <Shuffle size={22} />
                         </button>
@@ -256,7 +256,7 @@ export const Player: React.FC<PlayerProps> = ({
                         </button>
                         <button
                             onClick={onToggleRepeat}
-                            className={`p-2 tap-highlight-none relative ${repeatMode !== 'none' ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 dark:text-white/50'}`}
+                            className={`p-2 tap-highlight-none relative ${repeatMode !== 'none' ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400 dark:text-white/50'}`}
                         >
                             {repeatMode === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
                         </button>
@@ -345,7 +345,7 @@ export const Player: React.FC<PlayerProps> = ({
                     onClick={(e) => handleSeekInteraction(e, progressBarRef)}
                 >
                     <div
-                        className="h-full bg-pink-600 dark:bg-pink-500"
+                        className="h-full bg-violet-600 dark:bg-violet-500"
                         style={{ width: `${progressPercent}%` }}
                     />
                 </div>
@@ -380,7 +380,7 @@ export const Player: React.FC<PlayerProps> = ({
                     <div className="flex items-center gap-1 flex-shrink-0">
                         <button
                             onClick={onToggleLike}
-                            className={`p-2 tap-highlight-none ${isLiked ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400'}`}
+                            className={`p-2 tap-highlight-none ${isLiked ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400'}`}
                         >
                             <Heart size={20} fill={isLiked ? "currentColor" : "none"} />
                         </button>
@@ -469,10 +469,10 @@ export const Player: React.FC<PlayerProps> = ({
                                     onClick={(e) => handleSeekInteraction(e, fullscreenProgressRef)}
                                 >
                                     <div
-                                        className="h-full bg-zinc-900 dark:bg-white rounded-full relative group-hover:bg-pink-600 dark:group-hover:bg-pink-500 transition-colors"
+                                        className="h-full bg-zinc-900 dark:bg-white rounded-full relative group-hover:bg-violet-600 dark:group-hover:bg-violet-500 transition-colors"
                                         style={{ width: `${progressPercent}%` }}
                                     >
-                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-zinc-900 dark:bg-white group-hover:bg-pink-600 dark:group-hover:bg-pink-500 rounded-full shadow-lg -mr-2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                                        <div className="absolute right-0 top-1/2 -translate-y-1/2 w-4 h-4 bg-zinc-900 dark:bg-white group-hover:bg-violet-600 dark:group-hover:bg-violet-500 rounded-full shadow-lg -mr-2 opacity-0 group-hover:opacity-100 transition-opacity" />
                                     </div>
                                 </div>
                                 <div className="flex justify-between mt-2 text-sm text-zinc-500 dark:text-white/50 font-mono">
@@ -485,7 +485,7 @@ export const Player: React.FC<PlayerProps> = ({
                             <div className="flex items-center justify-center gap-8 py-2 w-full">
                                 <button
                                     onClick={onToggleShuffle}
-                                    className={`p-2 transition-colors ${isShuffle ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                                    className={`p-2 transition-colors ${isShuffle ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                                 >
                                     <Shuffle size={22} />
                                 </button>
@@ -509,7 +509,7 @@ export const Player: React.FC<PlayerProps> = ({
                                 </button>
                                 <button
                                     onClick={onToggleRepeat}
-                                    className={`p-2 transition-colors relative ${repeatMode !== 'none' ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                                    className={`p-2 transition-colors relative ${repeatMode !== 'none' ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                                 >
                                     {repeatMode === 'one' ? <Repeat1 size={22} /> : <Repeat size={22} />}
                                     {repeatMode !== 'none' && <div className="absolute -bottom-1 left-1/2 -translate-x-1/2 w-1 h-1 bg-current rounded-full"></div>}
@@ -534,7 +534,7 @@ export const Player: React.FC<PlayerProps> = ({
                                                     setShowSpeedMenu(false);
                                                 }}
                                                 className={`w-full px-3 py-1.5 text-left text-xs font-mono hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors ${
-                                                    playbackRate === rate ? 'text-pink-600 dark:text-pink-500 font-bold' : 'text-zinc-700 dark:text-zinc-300'
+                                                    playbackRate === rate ? 'text-violet-600 dark:text-violet-500 font-bold' : 'text-zinc-700 dark:text-zinc-300'
                                                 }`}
                                             >
                                                 {rate === 1.0 ? t('normalSpeed') : `${rate}x`}
@@ -579,7 +579,7 @@ export const Player: React.FC<PlayerProps> = ({
                             <div className="flex items-center justify-center gap-4 text-zinc-400 dark:text-white/50">
                                 <button
                                     onClick={onToggleLike}
-                                    className={`p-3 rounded-full hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors ${isLiked ? 'text-pink-600 dark:text-pink-500' : ''}`}
+                                    className={`p-3 rounded-full hover:bg-zinc-200 dark:hover:bg-white/10 transition-colors ${isLiked ? 'text-violet-600 dark:text-violet-500' : ''}`}
                                 >
                                     <Heart size={22} fill={isLiked ? "currentColor" : "none"} />
                                 </button>
@@ -645,10 +645,10 @@ export const Player: React.FC<PlayerProps> = ({
                 onClick={(e) => handleSeekInteraction(e, progressBarRef)}
             >
                 <div
-                    className="h-full bg-zinc-900 dark:bg-white relative group-hover:bg-pink-600 dark:group-hover:bg-pink-500 transition-colors"
+                    className="h-full bg-violet-600 dark:bg-violet-500 relative transition-colors"
                     style={{ width: `${progressPercent}%` }}
                 >
-                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-zinc-900 dark:bg-white group-hover:bg-pink-600 dark:group-hover:bg-pink-500 rounded-full shadow-lg -mr-2 opacity-0 group-hover:opacity-100 transition-opacity" />
+                    <div className="absolute right-0 top-1/2 -translate-y-1/2 w-3 h-3 bg-violet-600 dark:bg-violet-500 rounded-full shadow-lg -mr-2 opacity-0 group-hover:opacity-100 transition-opacity" />
                 </div>
                 {/* Hit area for easier clicking */}
                 <div className="absolute top-1/2 -translate-y-1/2 w-full h-4 -z-10"></div>
@@ -667,7 +667,7 @@ export const Player: React.FC<PlayerProps> = ({
                     <div className="overflow-hidden min-w-0">
                         <h4
                             onClick={() => onNavigateToSong?.(currentSong.id)}
-                            className="text-xs sm:text-sm font-bold text-zinc-900 dark:text-white truncate cursor-pointer hover:underline"
+                            className="text-xs sm:text-sm font-bold text-violet-600 dark:text-violet-400 truncate cursor-pointer hover:underline"
                         >
                             {currentSong.title}
                         </h4>
@@ -675,7 +675,7 @@ export const Player: React.FC<PlayerProps> = ({
                     </div>
                     <button
                         onClick={onToggleLike}
-                        className={`ml-1 sm:ml-2 transition-colors flex-shrink-0 hidden sm:block ${isLiked ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                        className={`ml-1 sm:ml-2 transition-colors flex-shrink-0 hidden sm:block ${isLiked ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                     >
                         <Heart size={18} fill={isLiked ? "currentColor" : "none"} />
                     </button>
@@ -686,7 +686,7 @@ export const Player: React.FC<PlayerProps> = ({
                     <div className="flex items-center gap-2 sm:gap-4 lg:gap-6">
                         <button
                             onClick={onToggleShuffle}
-                            className={`transition-colors hidden sm:block ${isShuffle ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
+                            className={`transition-colors hidden sm:block ${isShuffle ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'}`}
                         >
                             <Shuffle size={16} />
                         </button>
@@ -710,7 +710,7 @@ export const Player: React.FC<PlayerProps> = ({
                         </button>
                         <button
                             onClick={onToggleRepeat}
-                            className={`transition-colors hidden sm:block ${repeatMode !== 'none' ? 'text-pink-600 dark:text-pink-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'} relative`}
+                            className={`transition-colors hidden sm:block ${repeatMode !== 'none' ? 'text-violet-600 dark:text-violet-500' : 'text-zinc-400 hover:text-zinc-900 dark:hover:text-white'} relative`}
                         >
                             {repeatMode === 'one' ? <Repeat1 size={16} /> : <Repeat size={16} />}
                             {repeatMode !== 'none' && <div className="absolute -bottom-1.5 left-1/2 -translate-x-1/2 w-1 h-1 bg-current rounded-full"></div>}
@@ -742,7 +742,7 @@ export const Player: React.FC<PlayerProps> = ({
                                             setShowSpeedMenu(false);
                                         }}
                                         className={`w-full px-3 py-1.5 text-left text-xs font-mono hover:bg-zinc-100 dark:hover:bg-white/10 transition-colors ${
-                                            playbackRate === rate ? 'text-pink-600 dark:text-pink-500 font-bold' : 'text-zinc-700 dark:text-zinc-300'
+                                            playbackRate === rate ? 'text-violet-600 dark:text-violet-500 font-bold' : 'text-zinc-700 dark:text-zinc-300'
                                         }`}
                                     >
                                         {rate === 1.0 ? t('normalSpeed') : `${rate}x`}
