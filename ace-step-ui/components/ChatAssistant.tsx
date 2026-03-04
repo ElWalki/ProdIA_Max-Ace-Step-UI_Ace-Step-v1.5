@@ -1,5 +1,6 @@
 import React, { useState, useRef, useEffect, useCallback } from 'react';
 import { MessageSquare, X, Send, Loader2, Music, Sparkles, ChevronDown, Zap, Code2, ClipboardPaste, FileEdit, Replace, Disc3, Settings2, CheckCircle2, ToggleLeft, ToggleRight, Play, Pause, Square, Volume2, Palette, Plus, SkipForward, SkipBack, Edit3, Check, Trash2, GripVertical, Minimize2, Globe } from 'lucide-react';
+import { useI18n } from '../context/I18nContext';
 import { chatWithAssistant, formatParamsForDisplay, ChatMessage, ParsedMusicRequest } from '../services/chatService';
 import { ChordProgressionEditor, InlineChordPreview, ChordProgressionState } from './ChordProgressionEditor';
 import { resolveProgression, formatProgressionForGeneration, CHORD_PRESETS, ScaleType } from '../services/chordService';
@@ -78,6 +79,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
   });
   const isResizing = useRef(false);
   const prevIsGenerating = useRef(isGenerating);
+  const { t } = useI18n();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatPanelRef = useRef<HTMLDivElement>(null);
@@ -233,7 +235,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
     if (action.type === 'swapModel') return `🤖 Cambiar modelo → ${action.model}`;
     if (action.type === 'purgeVram') return '💾 Purgar VRAM';
     if (action.type === 'loadLora') return `🧬 Cargar LoRA: ${action.name}`;
-    if (action.type === 'unloadLora') return '🧬 Descargar LoRA';
+    if (action.type === 'unloadLora') return t('chatAssistant.formatActionUnloadLora');
     return (action as any).type || 'acción';
   };
 
@@ -475,13 +477,13 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
       setMessages(prev => [...prev, {
         id: `error-${Date.now()}`,
         role: 'assistant',
-        content: '⚠️ Algo salió mal. Inténtalo de nuevo.',
+        content: t('chatAssistant.errorMessage'),
         timestamp: new Date(),
       }]);
     } finally {
       setIsLoading(false);
     }
-  }, [input, isLoading, messages]);
+  }, [input, isLoading, messages, t]);
 
   const handleKeyDown = (e: React.KeyboardEvent) => {
     if (e.key === 'Enter' && !e.shiftKey) {
@@ -648,7 +650,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
           }
           text-white
         `}
-        title="Music Assistant Chat"
+        title={t('chatAssistant.buttonTitle')}
       >
         {isOpen ? <X size={22} /> : <MessageSquare size={22} />}
         {!isOpen && messages.filter(m => m.parsedParams).length > 0 && (
@@ -667,7 +669,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
           onDrop={handleSongDrop}
         >
           <Disc3 size={24} className="text-purple-400 animate-spin" style={{ animationDuration: '3s' }} />
-          <span className="text-[11px] text-purple-300 font-medium text-center px-2">Soltar canción aquí</span>
+          <span className="text-[11px] text-purple-300 font-medium text-center px-2">{t('chatAssistant.dropSongHere')}</span>
         </div>
       )}
 
@@ -695,7 +697,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
           <div
             onMouseDown={startResize}
             className="absolute top-0 left-0 w-6 h-6 cursor-nw-resize z-50 flex items-center justify-center opacity-0 hover:opacity-60 transition-opacity"
-            title="Redimensionar"
+            title={t('chatAssistant.resizeTooltip')}
           >
             <GripVertical size={10} className="text-zinc-500 rotate-45" />
           </div>
@@ -746,7 +748,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                 <button
                   onClick={clearChat}
                   className="p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors"
-                  title="Nuevo chat"
+                  title={t('chatAssistant.clearChatTooltip')}
                 >
                   <Trash2 size={13} />
                 </button>
@@ -754,7 +756,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                 <button
                   onClick={() => setIsOpen(false)}
                   className="p-1.5 text-zinc-500 hover:text-zinc-300 hover:bg-zinc-800 rounded-lg transition-colors"
-                  title="Minimizar"
+                  title={t('chatAssistant.minimizeTooltip')}
                 >
                   <Minimize2 size={13} />
                 </button>
@@ -775,7 +777,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                   title="Generar con la configuración actual"
                 >
                   <Zap size={10} />
-                  Crear canción
+                  {t('chatAssistant.createSongQuick')}
                 </button>
               )}
             </div>
@@ -790,7 +792,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                 }`}
               >
                 <MessageSquare size={12} className="inline mr-1" />
-                Chat
+                {t('chatAssistant.tabChat')}
               </button>
               <button
                 onClick={() => setActiveTab('codes')}
@@ -801,7 +803,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                 }`}
               >
                 <Code2 size={12} className="inline mr-1" />
-                Codes
+                {t('chatAssistant.tabCodes')}
                 {showCodes && <span className="ml-1 w-2 h-2 bg-cyan-400 rounded-full inline-block animate-pulse" />}
               </button>
               <button
@@ -813,7 +815,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                 }`}
               >
                 <Music size={12} className="inline mr-1" />
-                Acordes
+                {t('chatAssistant.tabChords')}
               </button>
             </div>
           </div>
@@ -839,7 +841,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                         <Disc3 size={12} className={`flex-shrink-0 ${
                           idx === 0 ? 'text-purple-400' : idx === 1 ? 'text-blue-400' : 'text-emerald-400'
                         }`} />
-                        <span className="text-[10px] text-zinc-300 truncate">{song.title || 'Sin t\u00edtulo'}</span>
+                        <span className="text-[10px] text-zinc-300 truncate">{song.title || t('chatAssistant.untitledSong')}</span>
                         {song.generationParams?.bpm && (
                           <span className="text-[9px] text-zinc-500 flex-shrink-0">{song.generationParams.bpm}bpm</span>
                         )}
@@ -904,7 +906,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                                 }
                               </button>
                               <div className="min-w-0 flex-1">
-                                <p className="text-[13px] font-semibold text-white truncate">{song.title || 'Sin título'}</p>
+                                <p className="text-[13px] font-semibold text-white truncate">{song.title || t('chatAssistant.untitledSong')}</p>
                                 <p className="text-[10px] text-zinc-400 truncate mt-0.5">{song.style ? song.style.substring(0, 80) : 'ProdIA Pro'}</p>
                               </div>
                               {isThisPlaying && (
@@ -943,8 +945,8 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                             {song.generationParams?.bpm && <span className="text-[9px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-700/30">{song.generationParams.bpm} bpm</span>}
                             {song.generationParams?.keyScale && <span className="text-[9px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-700/30">{song.generationParams.keyScale}</span>}
                             {song.generationParams?.ditModel && <span className="text-[9px] bg-zinc-800 text-zinc-400 px-2 py-0.5 rounded-full border border-zinc-700/30">{song.generationParams.ditModel}</span>}
-                            {isCurrent && isThisPlaying && <span className="text-[9px] text-purple-400 ml-auto">♫ Reproduciendo</span>}
-                            {isCurrent && !isThisPlaying && <span className="text-[9px] text-zinc-500 ml-auto">⏸ En pausa</span>}
+                            {isCurrent && isThisPlaying && <span className="text-[9px] text-purple-400 ml-auto">{t('chatAssistant.nowPlaying')}</span>}
+                            {isCurrent && !isThisPlaying && <span className="text-[9px] text-zinc-500 ml-auto">{t('chatAssistant.paused')}</span>}
                           </div>
                         </div>
                       </div>
@@ -1005,7 +1007,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                               onClick={() => setPendingActionsMap(prev => { const { [msg.id]: _, ...rest } = prev; return rest; })}
                               className="py-1.5 px-3 text-[10px] font-medium bg-zinc-700 hover:bg-zinc-600 text-zinc-300 rounded-md transition-colors"
                             >
-                              Descartar
+                              {t('chatAssistant.pendingDiscard')}
                             </button>
                           </div>
                         </div>
@@ -1031,7 +1033,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                         <div className="mt-2 p-2 bg-zinc-900/60 rounded-lg border border-purple-600/20">
                           <div className="flex items-center gap-1.5 mb-1">
                             <Palette size={11} className="text-purple-400" />
-                            <span className="text-[10px] font-semibold text-purple-400">Estilo detectado</span>
+                            <span className="text-[10px] font-semibold text-purple-400">{t('chatAssistant.styleDetected')}</span>
                           </div>
                           <p className="text-[9px] text-zinc-400 mb-1.5 font-mono truncate" title={styleInMessage}>{styleInMessage}</p>
                           <div className="flex gap-1.5">
@@ -1040,14 +1042,14 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                               className="flex-1 py-1.5 px-2 text-[10px] font-medium bg-purple-600 hover:bg-purple-500 text-white rounded-md transition-colors flex items-center justify-center gap-1"
                             >
                               <Replace size={10} />
-                              Reemplazar estilo
+                              {t('chatAssistant.replaceStyle')}
                             </button>
                             <button
                               onClick={() => handlePasteStyle(styleInMessage, 'append')}
                               className="flex-1 py-1.5 px-2 text-[10px] font-medium bg-zinc-600 hover:bg-zinc-500 text-white rounded-md transition-colors flex items-center justify-center gap-1"
                             >
                               <Plus size={10} />
-                              Añadir tags
+                              {t('chatAssistant.appendTags')}
                             </button>
                           </div>
                         </div>
@@ -1068,7 +1070,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                         <div className="mt-2 p-2 bg-zinc-900/60 rounded-lg border border-green-600/20">
                           <div className="flex items-center gap-1.5 mb-1.5">
                             <ClipboardPaste size={11} className="text-green-400" />
-                            <span className="text-[10px] font-semibold text-green-400">Letra detectada</span>
+                            <span className="text-[10px] font-semibold text-green-400">{t('chatAssistant.lyricsDetected')}</span>
                           </div>
                           <div className="flex gap-1.5">
                             <button
@@ -1076,14 +1078,14 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                               className="flex-1 py-1.5 px-2 text-[10px] font-medium bg-green-600 hover:bg-green-500 text-white rounded-md transition-colors flex items-center justify-center gap-1"
                             >
                               <Replace size={10} />
-                              Sobrescribir
+                              {t('chatAssistant.lyricsOverwrite')}
                             </button>
                             <button
                               onClick={() => handlePasteLyrics(availableLyrics, 'append')}
                               className="flex-1 py-1.5 px-2 text-[10px] font-medium bg-zinc-600 hover:bg-zinc-500 text-white rounded-md transition-colors flex items-center justify-center gap-1"
                             >
                               <FileEdit size={10} />
-                              Añadir al final
+                              {t('chatAssistant.lyricsAppend')}
                             </button>
                           </div>
                         </div>
@@ -1094,7 +1096,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                         <div className="mt-2.5 p-2.5 bg-zinc-900/80 rounded-xl border border-zinc-600/30">
                           <div className="flex items-center gap-1.5 mb-2">
                             <Sparkles size={12} className="text-amber-400" />
-                            <span className="text-[11px] font-semibold text-amber-400">Parámetros sugeridos</span>
+                            <span className="text-[11px] font-semibold text-amber-400">{t('chatAssistant.suggestedParams')}</span>
                           </div>
                           <pre className="text-[10px] text-zinc-400 whitespace-pre-wrap font-mono leading-relaxed">
                             {formatParamsForDisplay(msg.parsedParams)}
@@ -1105,14 +1107,14 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                               className="flex-1 py-1.5 px-3 text-[11px] font-medium bg-purple-600 hover:bg-purple-500 text-white rounded-lg transition-colors flex items-center justify-center gap-1"
                             >
                               <ChevronDown size={12} />
-                              Aplicar
+                              {t('chatAssistant.applyParams')}
                             </button>
                             <button
                               onClick={() => handleGenerateNow(msg.parsedParams!)}
                               className="flex-1 py-1.5 px-3 text-[11px] font-medium bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-lg transition-colors flex items-center justify-center gap-1"
                             >
                               <Zap size={12} />
-                              ¡Generar!
+                              {t('chatAssistant.generateNow')}
                             </button>
                           </div>
                         </div>
@@ -1127,7 +1129,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                     <div className="bg-zinc-800 rounded-2xl rounded-bl-md px-4 py-3 border border-zinc-700/30">
                       <div className="flex items-center gap-2">
                         <Loader2 size={14} className="animate-spin text-purple-400" />
-                        <span className="text-zinc-400 text-[12px] animate-pulse">Cocinando ideas... 🎵</span>
+                        <span className="text-zinc-400 text-[12px] animate-pulse">{t('chatAssistant.thinkingIndicator')}</span>
                       </div>
                     </div>
                   </div>
@@ -1138,7 +1140,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                     <div className="bg-gradient-to-r from-purple-900/30 to-violet-900/30 rounded-2xl rounded-bl-md px-4 py-3 border border-purple-500/20">
                       <div className="flex items-center gap-2">
                         <Disc3 size={14} className="animate-spin text-purple-400" />
-                        <span className="text-purple-300 text-[12px] animate-pulse font-medium">🔥 Generando tu track... ¡Esto va a sonar brutal!</span>
+                        <span className="text-purple-300 text-[12px] animate-pulse font-medium">{t('chatAssistant.generatingTrack')}</span>
                       </div>
                     </div>
                   </div>
@@ -1155,7 +1157,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                     <div className="flex items-center justify-between mb-1.5">
                       <div className="flex items-center gap-1.5">
                         <Palette size={11} className="text-purple-400" />
-                        <span className="text-[10px] font-semibold text-purple-400">Editar Estilo / Tags</span>
+                        <span className="text-[10px] font-semibold text-purple-400">{t('chatAssistant.styleEditorTitle')}</span>
                       </div>
                       <button onClick={() => setEditingStyle(false)} className="text-zinc-500 hover:text-zinc-300">
                         <X size={12} />
@@ -1174,7 +1176,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                         className="flex-1 py-1.5 text-[10px] font-medium bg-purple-600 hover:bg-purple-500 text-white rounded-md transition-colors flex items-center justify-center gap-1"
                       >
                         <Check size={10} />
-                        Aplicar estilo
+                        {t('chatAssistant.applyStyle')}
                       </button>
                     </div>
                   </div>
@@ -1186,14 +1188,14 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                     className={`flex items-center gap-1 px-2 py-1 text-[9px] font-medium rounded-md transition-colors ${editingStyle ? 'bg-purple-600/20 text-purple-400 border border-purple-500/30' : 'bg-zinc-800 text-zinc-400 hover:text-purple-400 hover:bg-zinc-700 border border-zinc-700/30'}`}
                   >
                     <Palette size={9} />
-                    Estilo
+                    {t('chatAssistant.quickStyle')}
                   </button>
                   <button
                     onClick={() => setActiveTab('chords')}
                     className={`flex items-center gap-1 px-2 py-1 text-[9px] font-medium rounded-md transition-colors ${activeTab === 'chords' ? 'bg-violet-600/20 text-violet-400 border border-violet-500/30' : 'bg-zinc-800 text-zinc-400 hover:text-violet-400 hover:bg-zinc-700 border border-zinc-700/30'}`}
                   >
                     <Music size={9} />
-                    Acordes
+                    {t('chatAssistant.quickChords')}
                   </button>
                 </div>
                 <div className="flex items-end gap-2 bg-zinc-800 rounded-xl border border-zinc-700/30 p-1.5">
@@ -1202,7 +1204,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                     value={input}
                     onChange={(e) => setInput(e.target.value)}
                     onKeyDown={handleKeyDown}
-                    placeholder="Descríbeme la música que quieres..."
+                    placeholder={t('chatAssistant.inputPlaceholder')}
                     rows={1}
                     className="flex-1 bg-transparent text-[13px] text-white placeholder-zinc-500 resize-none outline-none px-2 py-1.5 max-h-24 scrollbar-thin"
                     style={{ minHeight: '32px' }}
@@ -1221,7 +1223,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                   </button>
                 </div>
                 <p className="text-[9px] text-zinc-600 mt-1.5 text-center">
-                  Shift+Enter nueva línea · Enter enviar
+                  {t('chatAssistant.inputHint')}
                 </p>
               </div>
             </>
@@ -1233,7 +1235,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
               <div className="space-y-3">
                 <div className="flex items-center gap-2 mb-2">
                   <Code2 size={14} className="text-cyan-400" />
-                  <h4 className="text-xs font-semibold text-cyan-400">Audio Code Tokens</h4>
+                  <h4 className="text-xs font-semibold text-cyan-400">{t('chatAssistant.codeTabTitle')}</h4>
                 </div>
                 
                 {audioCodes && audioCodes.trim() ? (
@@ -1254,14 +1256,14 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                         onClick={() => navigator.clipboard.writeText(audioCodes)}
                         className="text-[10px] text-cyan-400 hover:text-cyan-300 underline"
                       >
-                        Copy
+                        {t('chatAssistant.copyButton')}
                       </button>
                     </div>
                   </>
                 ) : (
                   <div className="flex flex-col items-center justify-center h-64 text-zinc-600">
                     <Code2 size={32} className="mb-3 opacity-30" />
-                    <p className="text-xs text-center">No hay audio codes todavía.</p>
+                    <p className="text-xs text-center">{t('chatAssistant.noCodesYet')}</p>
                     <p className="text-[10px] text-center mt-1 text-zinc-700">
                       Los audio codes aparecerán aquí cuando actives<br />
                       "Audio Codes" en los ajustes avanzados de generación<br />
@@ -1275,7 +1277,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                   <div className="mt-3 p-2.5 bg-amber-500/5 border border-amber-500/20 rounded-xl">
                     <div className="flex items-center gap-2">
                       <Loader2 size={12} className="animate-spin text-amber-400" />
-                      <span className="text-[11px] text-amber-400">Generando audio — los codes pueden actualizarse en tiempo real...</span>
+                      <span className="text-[11px] text-amber-400">{t('chatAssistant.updatingCodes')}</span>
                     </div>
                   </div>
                 )}

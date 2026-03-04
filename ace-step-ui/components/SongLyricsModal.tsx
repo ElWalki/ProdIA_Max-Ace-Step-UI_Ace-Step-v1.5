@@ -3,6 +3,7 @@ import { X, Music2, Search, Loader2 } from 'lucide-react';
 import { Song } from '../types';
 import { songsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../context/I18nContext';
 
 interface SongLyricsModalProps {
   isOpen: boolean;
@@ -12,6 +13,7 @@ interface SongLyricsModalProps {
 
 export function SongLyricsModal({ isOpen, onClose, onSelectSong }: SongLyricsModalProps) {
   const { token } = useAuth();
+  const { t } = useI18n();
   const [songs, setSongs] = useState<Song[]>([]);
   const [loading, setLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -63,10 +65,10 @@ export function SongLyricsModal({ isOpen, onClose, onSelectSong }: SongLyricsMod
         <div className="flex items-center justify-between p-6 border-b border-zinc-200 dark:border-zinc-800">
           <div>
             <h2 className="text-2xl font-bold text-zinc-900 dark:text-white">
-              {selectedSong ? 'Edit Lyrics' : 'Select Song'}
+              {selectedSong ? t('songLyrics.titleEditLyrics') : t('songLyrics.titleSelectSong')}
             </h2>
             <p className="text-sm text-zinc-500 dark:text-zinc-400 mt-1">
-              {selectedSong ? 'Review and edit the lyrics before generating' : 'Choose a song to extract lyrics from'}
+              {selectedSong ? t('songLyrics.subtitleEdit') : t('songLyrics.subtitleSelect')}
             </p>
           </div>
           <button
@@ -89,7 +91,7 @@ export function SongLyricsModal({ isOpen, onClose, onSelectSong }: SongLyricsMod
                     type="text"
                     value={searchQuery}
                     onChange={(e) => setSearchQuery(e.target.value)}
-                    placeholder="Search songs..."
+                    placeholder={t('songLyrics.searchPlaceholder')}
                     className="w-full pl-10 pr-4 py-2 bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-blue-500"
                   />
                 </div>
@@ -105,7 +107,7 @@ export function SongLyricsModal({ isOpen, onClose, onSelectSong }: SongLyricsMod
                   <div className="flex flex-col items-center justify-center h-64 text-zinc-400">
                     <Music2 size={48} className="mb-4 opacity-50" />
                     <p className="text-sm">
-                      {searchQuery ? 'No songs found' : 'No songs with lyrics found'}
+                      {searchQuery ? t('songLyrics.noSongsFound') : t('songLyrics.noSongsWithLyrics')}
                     </p>
                   </div>
                 ) : (
@@ -165,20 +167,20 @@ export function SongLyricsModal({ isOpen, onClose, onSelectSong }: SongLyricsMod
                   onClick={() => setSelectedSong(null)}
                   className="text-xs text-blue-600 dark:text-blue-400 hover:underline"
                 >
-                  Change Song
+                  {t('songLyrics.changeSongButton')}
                 </button>
               </div>
 
               {/* Lyrics Editor */}
               <div className="flex-1 flex flex-col">
                 <label className="text-sm font-medium text-zinc-700 dark:text-zinc-300 mb-2">
-                  Lyrics (edit as needed)
+                  {t('songLyrics.lyricsLabel')}
                 </label>
                 <textarea
                   value={editedLyrics}
                   onChange={(e) => setEditedLyrics(e.target.value)}
                   className="flex-1 p-4 bg-zinc-50 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg text-sm font-mono resize-none focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  placeholder="Enter lyrics..."
+                  placeholder={t('songLyrics.lyricsPlaceholder')}
                 />
               </div>
             </div>
@@ -192,14 +194,14 @@ export function SongLyricsModal({ isOpen, onClose, onSelectSong }: SongLyricsMod
               onClick={onClose}
               className="px-4 py-2 text-sm font-medium text-zinc-700 dark:text-zinc-300 hover:bg-zinc-100 dark:hover:bg-zinc-800 rounded-lg transition-colors"
             >
-              Cancel
+              {t('cancel')}
             </button>
             <button
               onClick={handleConfirm}
               disabled={!editedLyrics.trim()}
               className="px-6 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 disabled:bg-zinc-300 dark:disabled:bg-zinc-700 disabled:cursor-not-allowed rounded-lg transition-colors"
             >
-              Use These Lyrics
+              {t('songLyrics.useLyricsButton')}
             </button>
           </div>
         )}

@@ -2,6 +2,7 @@ import React, { useState, useEffect } from 'react';
 import { Song } from '../types';
 import { songsApi } from '../services/api';
 import { useAuth } from '../context/AuthContext';
+import { useI18n } from '../context/I18nContext';
 import { X, Save, Loader2 } from 'lucide-react';
 
 interface EditMetadataModalProps {
@@ -39,6 +40,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
   onSaved,
 }) => {
   const { token } = useAuth();
+  const { t } = useI18n();
   const [saving, setSaving] = useState(false);
   const [error, setError] = useState<string | null>(null);
 
@@ -100,7 +102,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
       });
       onClose();
     } catch (err) {
-      setError(err instanceof Error ? err.message : 'Failed to save metadata');
+      setError(err instanceof Error ? err.message : t('editMetadata.failedToSave'));
     } finally {
       setSaving(false);
     }
@@ -114,7 +116,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
       >
         {/* Header */}
         <div className="px-5 py-4 border-b border-zinc-200 dark:border-zinc-700 flex items-center justify-between">
-          <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Edit Metadata</h3>
+          <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{t('editMetadata.modalTitle')}</h3>
           <button onClick={onClose} className="text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 transition-colors">
             <X size={18} />
           </button>
@@ -124,7 +126,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
         <div className="p-5 space-y-4">
           {/* Title */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Title</label>
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('title')}</label>
             <input
               type="text"
               value={title}
@@ -135,7 +137,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
 
           {/* Style / Genre */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Style / Genre</label>
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('editMetadata.styleGenreLabel')}</label>
             <input
               type="text"
               value={style}
@@ -147,25 +149,25 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
           {/* BPM + Key row */}
           <div className="grid grid-cols-2 gap-3">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">BPM</label>
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('bpm')}</label>
               <input
                 type="number"
                 min={30}
                 max={300}
                 value={bpm}
                 onChange={(e) => setBpm(e.target.value)}
-                placeholder="Auto"
+                placeholder={t('auto')}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500"
               />
             </div>
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Key</label>
+              <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('editMetadata.keyLabel')}</label>
               <select
                 value={keyScale}
                 onChange={(e) => setKeyScale(e.target.value)}
                 className="w-full bg-zinc-50 dark:bg-black/20 border border-zinc-200 dark:border-white/10 rounded-lg px-3 py-2 text-sm text-zinc-900 dark:text-white focus:outline-none focus:border-violet-500 cursor-pointer"
               >
-                <option value="">Auto</option>
+                <option value="">{t('auto')}</option>
                 {KEY_OPTIONS.filter(k => k).map(k => (
                   <option key={k} value={k}>{k}</option>
                 ))}
@@ -175,7 +177,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
 
           {/* Time Signature */}
           <div className="space-y-1.5">
-            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">Time Signature</label>
+            <label className="text-xs font-medium text-zinc-600 dark:text-zinc-400">{t('timeSignature')}</label>
             <select
               value={timeSig}
               onChange={(e) => setTimeSig(e.target.value)}
@@ -200,7 +202,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
             onClick={onClose}
             className="px-4 py-2 rounded-lg text-sm font-medium text-zinc-600 dark:text-zinc-400 hover:bg-zinc-100 dark:hover:bg-white/5 transition-colors"
           >
-            Cancel
+            {t('cancel')}
           </button>
           <button
             onClick={handleSave}
@@ -208,7 +210,7 @@ export const EditMetadataModal: React.FC<EditMetadataModalProps> = ({
             className="px-4 py-2 rounded-lg text-sm font-semibold bg-gradient-to-r from-violet-500 to-purple-600 text-white hover:brightness-110 transition-all disabled:opacity-50 flex items-center gap-2"
           >
             {saving ? <Loader2 size={14} className="animate-spin" /> : <Save size={14} />}
-            Save
+            {t('save')}
           </button>
         </div>
       </div>

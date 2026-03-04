@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import { Song } from '../types';
 import { songsApi } from '../services/api';
+import { useI18n } from '../context/I18nContext';
 import { Loader2 } from 'lucide-react';
 
 interface GenerationConfigModalProps {
@@ -11,8 +12,8 @@ interface GenerationConfigModalProps {
 }
 
 // Map model ID to readable name
-const getModelLabel = (modelId?: string): string => {
-    if (!modelId) return 'Unknown';
+const getModelLabel = (modelId?: string, unknownLabel?: string): string => {
+    if (!modelId) return unknownLabel ?? 'Unknown';
     const mapping: Record<string, string> = {
         'acestep-v15-base': 'ACE-Step 1.5 Base',
         'acestep-v15-sft': 'ACE-Step 1.5 SFT',
@@ -27,6 +28,7 @@ const getModelLabel = (modelId?: string): string => {
 export const GenerationConfigModal: React.FC<GenerationConfigModalProps> = ({ song, token, isOpen, onClose }) => {
     const [loading, setLoading] = useState(false);
     const [params, setParams] = useState<Record<string, any> | null>(null);
+    const { t } = useI18n();
 
     useEffect(() => {
         if (!isOpen) return;
@@ -66,70 +68,70 @@ export const GenerationConfigModal: React.FC<GenerationConfigModalProps> = ({ so
 
     const sections = params ? [
         {
-            title: 'Model',
+            title: t('genConfig.sectionModel'),
             icon: '🏗️',
             items: [
-                { label: 'DiT Model', value: getModelLabel(params.ditModel) },
-                { label: 'Inference Method', value: params.inferMethod?.toUpperCase() },
-                { label: 'Inference Steps', value: params.inferenceSteps },
-                { label: 'Guidance Scale', value: params.guidanceScale },
-                { label: 'Shift', value: params.shift },
-                { label: 'Audio Format', value: params.audioFormat?.toUpperCase() },
-                { label: 'Seed', value: params.randomSeed ? 'Random' : params.seed },
+                { label: t('genConfig.labelDitModel'), value: getModelLabel(params.ditModel, t('genConfig.unknownModel')) },
+                { label: t('genConfig.labelInferenceMethod'), value: params.inferMethod?.toUpperCase() },
+                { label: t('genConfig.labelInferenceSteps'), value: params.inferenceSteps },
+                { label: t('genConfig.labelGuidanceScale'), value: params.guidanceScale },
+                { label: t('genConfig.labelShift'), value: params.shift },
+                { label: t('genConfig.labelAudioFormat'), value: params.audioFormat?.toUpperCase() },
+                { label: t('genConfig.labelSeed'), value: params.randomSeed ? t('genConfig.valueRandom') : params.seed },
             ],
         },
         {
-            title: 'LoRA',
+            title: t('genConfig.sectionLora'),
             icon: '🎛️',
             items: [
-                { label: 'LoRA', value: params.loraLoaded ? 'Yes' : 'No' },
+                { label: t('genConfig.sectionLora'), value: params.loraLoaded ? t('genConfig.valueYes') : t('genConfig.valueNo') },
                 ...(params.loraLoaded ? [
-                    { label: 'Name', value: params.loraName || params.loraPath?.split(/[\\/]/).pop() },
-                    { label: 'Scale', value: params.loraScale },
-                    { label: 'Enabled', value: params.loraEnabled ? 'Yes' : 'No' },
-                    { label: 'Trigger Tag', value: params.loraTriggerTag },
-                    { label: 'Tag Injection', value: params.loraTagPosition },
+                    { label: t('genConfig.labelLoraName'), value: params.loraName || params.loraPath?.split(/[\\/]/).pop() },
+                    { label: t('genConfig.labelLoraScale'), value: params.loraScale },
+                    { label: t('genConfig.labelLoraEnabled'), value: params.loraEnabled ? t('genConfig.valueYes') : t('genConfig.valueNo') },
+                    { label: t('genConfig.labelLoraTriggerTag'), value: params.loraTriggerTag },
+                    { label: t('genConfig.labelLoraTagInjection'), value: params.loraTagPosition },
                 ] : []),
             ],
         },
         {
-            title: 'Music',
+            title: t('genConfig.sectionMusic'),
             icon: '🎵',
             items: [
-                { label: 'Duration', value: params.duration && params.duration > 0 ? `${params.duration}s` : 'Auto' },
-                { label: 'BPM', value: params.bpm || 'Auto' },
-                { label: 'Key', value: params.keyScale || 'Auto' },
-                { label: 'Time Signature', value: params.timeSignature || 'Auto' },
-                { label: 'Instrumental', value: params.instrumental ? 'Yes' : 'No' },
-                { label: 'Vocal Language', value: params.vocalLanguage || 'Auto' },
-                { label: 'Batch Size', value: params.batchSize },
+                { label: t('genConfig.labelDuration'), value: params.duration && params.duration > 0 ? `${params.duration}s` : t('auto') },
+                { label: t('bpm'), value: params.bpm || t('auto') },
+                { label: t('genConfig.labelKey'), value: params.keyScale || t('auto') },
+                { label: t('timeSignature'), value: params.timeSignature || t('auto') },
+                { label: t('genConfig.labelInstrumental'), value: params.instrumental ? t('genConfig.valueYes') : t('genConfig.valueNo') },
+                { label: t('genConfig.labelVocalLanguage'), value: params.vocalLanguage || t('auto') },
+                { label: t('genConfig.labelBatchSize'), value: params.batchSize },
             ],
         },
         {
-            title: 'LM (Language Model)',
+            title: t('genConfig.sectionLm'),
             icon: '🧠',
             items: [
-                { label: 'Backend', value: params.lmBackend?.toUpperCase() || 'PT' },
-                { label: 'LM Model', value: params.lmModel || 'Default' },
-                { label: 'Temperature', value: params.lmTemperature },
-                { label: 'CFG Scale', value: params.lmCfgScale },
-                { label: 'Top-K', value: params.lmTopK },
-                { label: 'Top-P', value: params.lmTopP },
-                { label: 'Thinking', value: params.thinking ? 'Yes' : 'No' },
+                { label: t('genConfig.labelBackend'), value: params.lmBackend?.toUpperCase() || 'PT' },
+                { label: t('genConfig.labelLmModel'), value: params.lmModel || 'Default' },
+                { label: t('genConfig.labelTemperature'), value: params.lmTemperature },
+                { label: t('genConfig.labelCfgScale'), value: params.lmCfgScale },
+                { label: t('genConfig.labelTopK'), value: params.lmTopK },
+                { label: t('genConfig.labelTopP'), value: params.lmTopP },
+                { label: t('genConfig.labelThinking'), value: params.thinking ? t('genConfig.valueYes') : t('genConfig.valueNo') },
             ],
         },
         {
-            title: 'Advanced',
+            title: t('genConfig.sectionAdvanced'),
             icon: '⚙️',
             items: [
-                { label: 'Mode', value: params.customMode ? 'Custom' : 'Simple' },
-                { label: 'ADG', value: params.useAdg ? 'Yes' : 'No' },
-                { label: 'Enhance', value: params.enhance ? 'Yes' : 'No' },
-                ...(params.referenceAudioUrl ? [{ label: 'Reference Audio', value: params.referenceAudioTitle || 'Yes' }] : []),
-                ...(params.sourceAudioUrl ? [{ label: 'Source Audio', value: params.sourceAudioTitle || 'Yes' }] : []),
-                ...(params.taskType && params.taskType !== 'text2music' ? [{ label: 'Task Type', value: params.taskType }] : []),
-                ...(params.cfgIntervalStart != null ? [{ label: 'CFG Interval', value: `${params.cfgIntervalStart} - ${params.cfgIntervalEnd}` }] : []),
-                ...(params.customTimesteps ? [{ label: 'Custom Timesteps', value: params.customTimesteps }] : []),
+                { label: t('genConfig.labelMode'), value: params.customMode ? t('genConfig.valueCustom') : t('genConfig.valueSimple') },
+                { label: t('genConfig.labelAdg'), value: params.useAdg ? t('genConfig.valueYes') : t('genConfig.valueNo') },
+                { label: t('genConfig.labelEnhance'), value: params.enhance ? t('genConfig.valueYes') : t('genConfig.valueNo') },
+                ...(params.referenceAudioUrl ? [{ label: t('genConfig.labelReferenceAudio'), value: params.referenceAudioTitle || t('genConfig.valueYes') }] : []),
+                ...(params.sourceAudioUrl ? [{ label: t('genConfig.labelSourceAudio'), value: params.sourceAudioTitle || t('genConfig.valueYes') }] : []),
+                ...(params.taskType && params.taskType !== 'text2music' ? [{ label: t('genConfig.labelTaskType'), value: params.taskType }] : []),
+                ...(params.cfgIntervalStart != null ? [{ label: t('genConfig.labelCfgInterval'), value: `${params.cfgIntervalStart} - ${params.cfgIntervalEnd}` }] : []),
+                ...(params.customTimesteps ? [{ label: t('genConfig.labelCustomTimesteps'), value: params.customTimesteps }] : []),
             ],
         },
     ] : [];
@@ -145,7 +147,7 @@ export const GenerationConfigModal: React.FC<GenerationConfigModalProps> = ({ so
                     <div className="min-w-0 flex-1">
                         <h3 className="text-sm font-bold text-zinc-900 dark:text-white flex items-center gap-2">
                             <svg className="w-4 h-4 text-violet-500 flex-shrink-0" fill="none" viewBox="0 0 24 24" stroke="currentColor"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10.325 4.317c.426-1.756 2.924-1.756 3.35 0a1.724 1.724 0 002.573 1.066c1.543-.94 3.31.826 2.37 2.37a1.724 1.724 0 001.066 2.573c1.756.426 1.756 2.924 0 3.35a1.724 1.724 0 00-1.066 2.573c.94 1.543-.826 3.31-2.37 2.37a1.724 1.724 0 00-2.573 1.066c-.426 1.756-2.924 1.756-3.35 0a1.724 1.724 0 00-2.573-1.066c-1.543.94-3.31-.826-2.37-2.37a1.724 1.724 0 00-1.066-2.573c-1.756-.426-1.756-2.924 0-3.35a1.724 1.724 0 001.066-2.573c-.94-1.543.826-3.31 2.37-2.37.996.608 2.296.07 2.572-1.065z" /><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>
-                            Generation Config
+                            {t('genConfig.modalTitle')}
                         </h3>
                         <p className="text-[11px] text-zinc-500 dark:text-zinc-400 truncate mt-0.5" title={song.title}>
                             {song.title}
@@ -164,8 +166,8 @@ export const GenerationConfigModal: React.FC<GenerationConfigModalProps> = ({ so
                         </div>
                     ) : !params ? (
                         <div className="text-center py-12">
-                            <p className="text-sm text-zinc-500 dark:text-zinc-400">No generation config available for this song.</p>
-                            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">Songs generated before this feature was added won't have config data.</p>
+                            <p className="text-sm text-zinc-500 dark:text-zinc-400">{t('genConfig.noConfigMessage')}</p>
+                            <p className="text-xs text-zinc-400 dark:text-zinc-500 mt-1">{t('genConfig.noConfigDetail')}</p>
                         </div>
                     ) : (
                         <div className="space-y-4">
@@ -201,7 +203,7 @@ export const GenerationConfigModal: React.FC<GenerationConfigModalProps> = ({ so
                         onClick={onClose}
                         className="w-full px-4 py-2 rounded-lg text-xs font-semibold bg-zinc-100 dark:bg-zinc-800 text-zinc-700 dark:text-zinc-300 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
                     >
-                        Close
+                        {t('genConfig.closeButton')}
                     </button>
                 </div>
             </div>

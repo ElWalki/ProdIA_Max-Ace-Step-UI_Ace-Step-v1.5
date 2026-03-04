@@ -1,6 +1,7 @@
 import React, { useEffect, useRef, useCallback, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { X } from 'lucide-react';
+import { useI18n } from '../context/I18nContext';
 
 interface MobileDrawerProps {
   isOpen: boolean;
@@ -11,6 +12,7 @@ interface MobileDrawerProps {
 }
 
 export function MobileDrawer({ isOpen, onClose, position, children, title }: MobileDrawerProps): React.ReactElement | null {
+  const { t } = useI18n();
   const [isClosing, setIsClosing] = useState(false);
   const drawerRef = useRef<HTMLDivElement>(null);
   const previousActiveElement = useRef<HTMLElement | null>(null);
@@ -124,7 +126,7 @@ export function MobileDrawer({ isOpen, onClose, position, children, title }: Mob
           <button
             onClick={handleClose}
             className="p-2 hover:bg-white/10 rounded-lg transition-colors text-zinc-400 hover:text-white tap-highlight-none"
-            aria-label="Close drawer"
+            aria-label={t('mobileDrawer.closeAriaLabel')}
           >
             <X size={20} />
           </button>

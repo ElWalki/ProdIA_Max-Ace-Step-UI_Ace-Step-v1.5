@@ -23,6 +23,7 @@ import {
   formatForCaption, formatProgressionForGeneration,
   getChordEngine, ChordAudioEngine, ScaleType,
 } from '../services/chordService';
+import { useI18n } from '../context/I18nContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -57,8 +58,8 @@ interface Props {
 // ---------------------------------------------------------------------------
 
 const SCALE_OPTIONS: { value: ScaleType; label: string }[] = [
-  { value: 'major', label: 'Mayor' },
-  { value: 'minor', label: 'Menor' },
+  { value: 'major', label: 'chordEditor.scaleMajor' },
+  { value: 'minor', label: 'chordEditor.scaleMinor' },
 ];
 
 /** Split roman string into tokens. */
@@ -82,6 +83,7 @@ const QUALITY_MODS = ['', '7', 'maj7', 'm7', 'sus2', 'sus4', 'dim', 'aug'];
 
 export function ChordProgressionEditor({ value, onChange, onApply, compact = false, showApply = true, externalBpm }: Props) {
   // Local state
+  const { t } = useI18n();
   const [activeChordIdx, setActiveChordIdx] = useState(-1); // currently playing/highlighted
   const [editingIdx, setEditingIdx] = useState<number | null>(null); // chord being edited
   const [presetFilter, setPresetFilter] = useState<ProgressionMood | 'all'>('all');
@@ -273,15 +275,15 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
               <Music size={14} className="text-violet-400" />
             </div>
             <div>
-              <h3 className="text-[13px] font-semibold text-white">Progresión de Acordes</h3>
-              <p className="text-[10px] text-zinc-500">Guía armónica para la generación</p>
+              <h3 className="text-[13px] font-semibold text-white">{t('chordEditor.panelTitle')}</h3>
+              <p className="text-[10px] text-zinc-500">{t('chordEditor.panelSubtitle')}</p>
             </div>
           </div>
           <div className="flex items-center gap-1">
-            <button onClick={handleCopy} className="p-1.5 text-zinc-500 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors" title="Copiar progresión">
+            <button onClick={handleCopy} className="p-1.5 text-zinc-500 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors" title={t('chordEditor.copyTooltip')}>
               {copied ? <Check size={13} className="text-green-400" /> : <Copy size={13} />}
             </button>
-            <button onClick={() => setIsMuted(!isMuted)} className="p-1.5 text-zinc-500 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors" title={isMuted ? 'Activar sonido' : 'Silenciar'}>
+            <button onClick={() => setIsMuted(!isMuted)} className="p-1.5 text-zinc-500 hover:text-zinc-300 rounded-lg hover:bg-zinc-800 transition-colors" title={isMuted ? t('chordEditor.unmuteTooltip') : t('chordEditor.muteTooltip')}>
               {isMuted ? <VolumeX size={13} /> : <Volume2 size={13} />}
             </button>
           </div>
@@ -293,7 +295,7 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
         <div className="flex items-center gap-2 flex-wrap">
           {/* Key selector */}
           <div className="flex items-center gap-1">
-            <span className="text-[10px] text-zinc-500 font-medium">Clave:</span>
+            <span className="text-[10px] text-zinc-500 font-medium">{t('chordEditor.keyLabel')}</span>
             <select
               value={value.key}
               onChange={(e) => { onChange({ ...value, key: e.target.value }); handleStop(); }}
@@ -317,7 +319,7 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
                     : 'text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                {opt.label}
+                {opt.value === 'major' ? t('chordEditor.scaleMajor') : t('chordEditor.scaleMinor')}
               </button>
             ))}
           </div>
@@ -325,7 +327,7 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
           {/* BPM (only in full mode) */}
           {!compact && !externalBpm && (
             <div className="flex items-center gap-1">
-              <span className="text-[10px] text-zinc-500 font-medium">BPM:</span>
+              <span className="text-[10px] text-zinc-500 font-medium">{t('chordEditor.bpmLabel')}</span>
               <input
                 type="number"
                 min={40}
@@ -355,7 +357,7 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
           <button
             onClick={randomize}
             className="p-1.5 text-zinc-500 hover:text-violet-400 rounded-lg hover:bg-zinc-800/80 transition-colors"
-            title="Progresión aleatoria"
+            title={t('chordEditor.randomizeTooltip')}
           >
             <Shuffle size={13} />
           </button>
@@ -368,7 +370,7 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
             }`}
           >
             {showPresets ? <ChevronDown size={10} /> : <ChevronRight size={10} />}
-            Presets
+            {t('chordEditor.presetsButton')}
           </button>
         </div>
 
@@ -481,7 +483,7 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
                   addChord(defaultChord);
                 }}
                 className="flex-shrink-0 w-[44px] rounded-xl border-2 border-dashed border-zinc-700/40 bg-zinc-800/30 hover:border-violet-500/40 hover:bg-violet-600/5 flex items-center justify-center transition-colors"
-                title="Añadir acorde"
+                title={t('chordEditor.addChordTooltip')}
               >
                 <Plus size={16} className="text-zinc-600" />
               </button>
@@ -571,16 +573,16 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
             }`}
           >
             {isPlaying ? <Square size={11} /> : <Play size={11} />}
-            {isPlaying ? 'Detener' : 'Escuchar'}
+            {isPlaying ? t('chordEditor.stopButton') : t('chordEditor.playButton')}
           </button>
 
           {/* Beats per chord — musical bar notation */}
           <div className="flex items-center gap-1">
-            <span className="text-[9px] text-zinc-500 font-medium">Compás:</span>
+            <span className="text-[9px] text-zinc-500 font-medium">{t('chordEditor.barLabel')}</span>
             <div className="flex items-center bg-zinc-800 rounded-lg border border-zinc-700/30 overflow-hidden">
               {([1, 2, 4] as const).map(beats => {
                 const label = `${beats}/4`;
-                const desc = beats === 1 ? 'rápido' : beats === 2 ? 'normal' : 'lento';
+                const desc = beats === 1 ? t('chordEditor.beatFast') : beats === 2 ? t('chordEditor.beatNormal') : t('chordEditor.beatSlow');
                 return (
                   <button
                     key={beats}
@@ -625,7 +627,7 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
               className="flex items-center gap-1 px-3 py-1.5 text-[11px] font-medium bg-gradient-to-r from-violet-600 to-purple-600 hover:from-violet-500 hover:to-purple-500 text-white rounded-lg transition-colors"
             >
               <Zap size={11} />
-              Aplicar
+              {t('chordEditor.applyButton')}
             </button>
           )}
         </div>
@@ -641,7 +643,7 @@ export function ChordProgressionEditor({ value, onChange, onApply, compact = fal
                   presetFilter === 'all' ? 'bg-zinc-600 text-white' : 'bg-zinc-800 text-zinc-500 hover:text-zinc-300'
                 }`}
               >
-                Todos
+                {t('chordEditor.allPresetsFilter')}
               </button>
               {ALL_MOODS.map(mood => (
                 <button
@@ -721,6 +723,7 @@ export interface ChordModalProps {
 }
 
 export function ChordModal({ isOpen, onClose, onApplyFull, projectBpm }: ChordModalProps) {
+  const { t } = useI18n();
   const [chordState, setChordState] = useState<ChordProgressionState>(() => {
     try {
       const stored = localStorage.getItem(CHORD_STORAGE_KEY);
@@ -840,12 +843,12 @@ export function ChordModal({ isOpen, onClose, onApplyFull, projectBpm }: ChordMo
   }) => {
     if (!onApplyFull) return;
     setIsApplying(true);
-    setApplyStatus('Renderizando progresión de acordes...');
+    setApplyStatus(t('chordEditor.statusRendering'));
 
     try {
       const chords = resolveProgression(chordState.roman, chordState.key, chordState.scale);
       if (chords.length === 0) {
-        setApplyStatus('⚠️ No hay acordes');
+        setApplyStatus(t('chordEditor.statusNoChords'));
         setTimeout(() => setApplyStatus(null), 2000);
         setIsApplying(false);
         return;
@@ -859,14 +862,14 @@ export function ChordModal({ isOpen, onClose, onApplyFull, projectBpm }: ChordMo
       const barLabel = `${bpc}x4`;
       const title = `Chords_${chordState.key}_${scaleLabel}_${chordState.bpm || 120}bpm_${barLabel}`;
 
-      setApplyStatus('Aplicando acordes al proyecto...');
+      setApplyStatus(t('chordEditor.statusApplying'));
       await onApplyFull({
         ...textData,
         referenceBlob: blob,
         referenceTitle: title,
       });
 
-      setApplyStatus('✅ ¡Progresión aplicada!');
+      setApplyStatus(t('chordEditor.statusApplied'));
       setTimeout(() => setApplyStatus(null), 3000);
     } catch (err: any) {
       setApplyStatus(`❌ Error: ${err?.message || 'fallo'}`);
@@ -874,7 +877,7 @@ export function ChordModal({ isOpen, onClose, onApplyFull, projectBpm }: ChordMo
     } finally {
       setIsApplying(false);
     }
-  }, [onApplyFull, chordState]);
+  }, [onApplyFull, chordState, t]);
 
   if (!isOpen) return null;
 
@@ -950,9 +953,9 @@ export function ChordModal({ isOpen, onClose, onApplyFull, projectBpm }: ChordMo
               <Piano size={16} className="text-violet-400" />
             </div>
             <div>
-              <h2 className="text-[14px] font-bold text-white">Progresión de Acordes</h2>
+              <h2 className="text-[14px] font-bold text-white">{t('chordEditor.modalTitle')}</h2>
               <p className="text-[10px] text-zinc-500">
-                Aplica y el modelo seguirá tu armonía automáticamente
+                {t('chordEditor.modalSubtitle')}
               </p>
             </div>
           </div>
@@ -989,13 +992,13 @@ export function ChordModal({ isOpen, onClose, onApplyFull, projectBpm }: ChordMo
                 className="w-3.5 h-3.5 rounded border-zinc-600 bg-zinc-800 text-violet-600 focus:ring-violet-500/30 cursor-pointer"
               />
               <span className="text-[10px] text-zinc-400 font-medium">
-                Inyectar audio de referencia automático
+                {t('chordEditor.autoReferenceToggle')}
               </span>
             </label>
 
             {useAutoReference && (
               <div className="flex items-center gap-1.5 ml-auto">
-                <span className="text-[9px] text-zinc-500">Fuerza:</span>
+                <span className="text-[9px] text-zinc-500">{t('chordEditor.refStrengthLabel')}</span>
                 <input
                   type="range"
                   min={0.1}
@@ -1050,6 +1053,7 @@ interface InlineChordProps {
 }
 
 export function InlineChordPreview({ roman, keyName, scale, onApply }: InlineChordProps) {
+  const { t } = useI18n();
   const [activeIdx, setActiveIdx] = useState(-1);
   const engineRef = useRef<ChordAudioEngine | null>(null);
 
@@ -1120,7 +1124,7 @@ export function InlineChordPreview({ roman, keyName, scale, onApply }: InlineCho
           }`}
         >
           {isPlaying ? <Square size={9} /> : <Play size={9} />}
-          {isPlaying ? 'Parar' : 'Escuchar'}
+          {isPlaying ? t('chordEditor.inlineStopButton') : t('chordEditor.inlinePlayButton')}
         </button>
         {onApply && (
           <button
@@ -1128,7 +1132,7 @@ export function InlineChordPreview({ roman, keyName, scale, onApply }: InlineCho
             className="flex-1 py-1.5 text-[10px] font-medium bg-violet-600 hover:bg-violet-500 text-white rounded-md transition-colors flex items-center justify-center gap-1"
           >
             <Zap size={9} />
-            Aplicar
+            {t('chordEditor.inlineApplyButton')}
           </button>
         )}
       </div>

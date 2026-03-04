@@ -33,6 +33,7 @@
 | **ACE-Step UI** (base UI) | [fspecii](https://github.com/fspecii) | MIT | [github.com/fspecii/ace-step-ui](https://github.com/fspecii/ace-step-ui) |
 | **ACE-Step 1.5** (AI model) | [ACE-Step Team](https://github.com/ace-step) | MIT | [github.com/ace-step/ACE-Step-1.5](https://github.com/ace-step/ACE-Step-1.5) |
 | **ProdIA-MAX** (this fork) | [ElWalki](https://github.com/ElWalki) | MIT | — |
+| **i18n system & translations** | [scruffynerf](https://github.com/scruffynerf) | MIT | [PR #1](https://github.com/ElWalki/ProdIA_Max-Ace-Step-UI_Ace-Step-v1.5/pull/1) |
 
 ---
 
@@ -201,5 +202,6 @@ See [ACE-Step-1.5_/LICENSE](ACE-Step-1.5_/LICENSE) for the full license text.
 
 <p align="center">
   Built on top of the amazing work of <a href="https://github.com/fspecii/ace-step-ui">fspecii</a> and the <a href="https://github.com/ace-step/ACE-Step-1.5">ACE-Step team</a>.<br>
+  i18n system & translations contributed by <a href="https://github.com/scruffynerf">scruffynerf</a>.<br>
   <em>Stop paying for Suno. Start creating with ACE-Step.</em>
 </p>

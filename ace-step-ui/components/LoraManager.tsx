@@ -3,6 +3,7 @@ import ReactDOM from 'react-dom';
 import { Search, Star, ChevronDown, FolderOpen, Loader2, X, GripVertical, Check, RefreshCw, FolderPlus, Trash2, Settings } from 'lucide-react';
 import { generateApi } from '../services/api';
 import { EditableSlider } from './EditableSlider';
+import { useI18n } from '../context/I18nContext';
 
 // ─── Types ──────────────────────────────────────────────────────────────────
 
@@ -103,6 +104,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
   onSetTagPosition,
 }) => {
   // ─── State ──────────────────────────────────────────────────────────────
+  const { t } = useI18n();
   const [loraList, setLoraList] = useState<LoraEntry[]>([]);
   const [listLoading, setListLoading] = useState(false);
   const [searchQuery, setSearchQuery] = useState('');
@@ -163,7 +165,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
     
     // Check if already added
     if (loraDirectories.includes(dir)) {
-      setDirError('Directory already added');
+      setDirError(t('loraManager.dirAlreadyAdded'));
       return;
     }
     
@@ -180,7 +182,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
       saveDirectories(newDirs);
       setNewDirInput('');
     } catch (err) {
-      setDirError(err instanceof Error ? err.message : 'Validation failed');
+      setDirError(err instanceof Error ? err.message : t('loraManager.dirValidationFailed'));
     } finally {
       setDirValidating(false);
     }
@@ -336,12 +338,12 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
         >
           <div className="flex items-center gap-2">
             <GripVertical size={14} className="text-zinc-400" />
-            <span className="text-sm font-bold text-zinc-800 dark:text-white">LoRA Manager</span>
+            <span className="text-sm font-bold text-zinc-800 dark:text-white">{t('loraManager.title')}</span>
             {loraLoaded && (
               <div className="flex items-center gap-1 px-1.5 py-0.5 rounded-full bg-green-100 dark:bg-green-900/30">
                 <div className="w-1.5 h-1.5 rounded-full bg-green-500 animate-pulse" />
                 <span className="text-[9px] font-semibold text-green-700 dark:text-green-400 truncate max-w-[120px]">
-                  {selectedLoraName || 'Active'}
+                  {selectedLoraName || t('loraManager.activeBadge')}
                 </span>
               </div>
             )}
@@ -354,7 +356,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                   ? 'text-purple-500 bg-purple-50 dark:bg-purple-900/20'
                   : 'text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800'
               }`}
-              title="Manage LoRA directories"
+              title={t('loraManager.manageDirsTooltip')}
             >
               <Settings size={14} />
             </button>
@@ -362,14 +364,14 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
               onClick={fetchList}
               disabled={listLoading}
               className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-zinc-600 dark:hover:text-zinc-200 hover:bg-zinc-100 dark:hover:bg-zinc-800 transition-colors"
-              title="Refresh LoRA list"
+              title={t('loraManager.refreshTooltip')}
             >
               {listLoading ? <Loader2 size={14} className="animate-spin" /> : <RefreshCw size={14} />}
             </button>
             <button
               onClick={onClose}
               className="w-7 h-7 rounded-lg flex items-center justify-center text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-              title="Close"
+              title={t('loraManager.closeTooltip')}  
             >
               <X size={14} />
             </button>
@@ -380,7 +382,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
         {dirManagerOpen && (
           <div className="px-4 py-3 bg-purple-50/50 dark:bg-purple-900/10 border-b border-zinc-200 dark:border-zinc-700 space-y-2">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">LoRA Directories</span>
+              <span className="text-[10px] font-bold text-purple-700 dark:text-purple-400 uppercase tracking-wider">{t('loraManager.dirManagerTitle')}</span>
               <span className="text-[9px] text-zinc-500 dark:text-zinc-400">{loraDirectories.length + 1} folder{loraDirectories.length !== 0 ? 's' : ''}</span>
             </div>
             
@@ -391,7 +393,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                 <span className="text-[10px] text-zinc-600 dark:text-zinc-300 truncate flex-1" title={defaultDirectory}>
                   {defaultDirectory.split(/[\\/]/).slice(-2).join('/')}
                 </span>
-                <span className="text-[8px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 font-medium">default</span>
+                <span className="text-[8px] px-1.5 py-0.5 rounded bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400 font-medium">{t('loraManager.dirDefaultBadge')}</span>
               </div>
             )}
             
@@ -405,7 +407,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                 <button
                   onClick={() => handleRemoveDirectory(dir)}
                   className="w-5 h-5 flex items-center justify-center rounded text-zinc-400 hover:text-red-500 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
-                  title="Remove directory"
+                  title={t('loraManager.dirRemoveTooltip')}
                 >
                   <Trash2 size={10} />
                 </button>
@@ -419,7 +421,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                 value={newDirInput}
                 onChange={(e) => { setNewDirInput(e.target.value); setDirError(null); }}
                 onKeyDown={(e) => e.key === 'Enter' && handleAddDirectory()}
-                placeholder="D:\\path\\to\\lora\\folder"
+                placeholder={t('loraManager.dirInputPlaceholder')}
                 className="flex-1 min-w-0 bg-white dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-lg px-2.5 py-1.5 text-[10px] text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-purple-500/30"
               />
               <button
@@ -428,7 +430,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                 className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg bg-purple-500 hover:bg-purple-600 text-white text-[10px] font-semibold transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
               >
                 {dirValidating ? <Loader2 size={10} className="animate-spin" /> : <FolderPlus size={10} />}
-                Add
+                {t('loraManager.dirAddButton')}
               </button>
             </div>
             
@@ -444,7 +446,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
           <div className="px-4 py-2.5 bg-green-50/50 dark:bg-green-900/10 border-b border-zinc-200 dark:border-zinc-700 space-y-2">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2">
-                <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">Active</span>
+                <span className="text-[10px] font-bold text-green-700 dark:text-green-400 uppercase tracking-wider">{t('loraManager.activeSectionTitle')}</span>
                 {loraTriggerTag && (
                   <span className="text-[9px] px-1.5 py-0.5 rounded bg-purple-100 dark:bg-purple-900/30 text-purple-600 dark:text-purple-400 font-medium">
                     🏷️ {loraTriggerTag}
@@ -460,20 +462,20 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                       : 'bg-zinc-200 dark:bg-zinc-700 text-zinc-500 dark:text-zinc-400'
                   }`}
                 >
-                  {loraEnabled ? 'ON' : 'OFF'}
+                  {loraEnabled ? t('loraManager.enableOn') : t('loraManager.enableOff')}
                 </button>
                 <button
                   onClick={onUnloadLora}
                   disabled={isLoraLoading}
                   className="px-2 py-0.5 rounded text-[9px] font-bold bg-red-100 dark:bg-red-900/30 text-red-600 dark:text-red-400 hover:bg-red-200 dark:hover:bg-red-900/50 transition-colors disabled:opacity-40"
                 >
-                  {isLoraLoading ? '...' : 'Unload'}
+                  {isLoraLoading ? '...' : t('loraManager.unloadButton')}
                 </button>
               </div>
             </div>
             {/* Scale slider */}
             <div className="flex items-center gap-3">
-              <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 w-10 shrink-0">Scale</span>
+              <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 w-10 shrink-0">{t('loraManager.scaleLabel')}</span>
               <input
                 type="range"
                 min={0}
@@ -488,7 +490,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
             {/* Tag position */}
             {loraTriggerTag && (
               <div className="flex items-center gap-2">
-                <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 w-10 shrink-0">Tag</span>
+                <span className="text-[9px] font-bold text-zinc-500 dark:text-zinc-400 w-10 shrink-0">{t('loraManager.tagLabel')}</span>
                 <div className="flex gap-1">
                   {(['prepend', 'append', 'off'] as const).map(mode => (
                     <button
@@ -500,7 +502,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                           : 'bg-zinc-100 dark:bg-zinc-800 text-zinc-500 dark:text-zinc-400 hover:bg-zinc-200 dark:hover:bg-zinc-700'
                       }`}
                     >
-                      {mode === 'prepend' ? '← Pre' : mode === 'append' ? 'App →' : 'Off'}
+                      {mode === 'prepend' ? t('loraManager.tagPrepend') : mode === 'append' ? t('loraManager.tagAppend') : t('loraManager.tagOff')}
                     </button>
                   ))}
                 </div>
@@ -517,7 +519,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
               type="text"
               value={searchQuery}
               onChange={(e) => setSearchQuery(e.target.value)}
-              placeholder="Search LoRAs..."
+              placeholder={t('loraManager.searchPlaceholder')}
               className="w-full bg-zinc-50 dark:bg-zinc-800/50 border border-zinc-200 dark:border-zinc-700 rounded-lg pl-8 pr-3 py-1.5 text-[11px] text-zinc-900 dark:text-white placeholder-zinc-400 dark:placeholder-zinc-500 focus:outline-none focus:ring-1 focus:ring-violet-500/30"
               autoComplete="off"
               spellCheck={false}
@@ -540,8 +542,8 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
             </div>
           ) : filteredLoras.length === 0 ? (
             <div className="flex flex-col items-center justify-center py-12 text-zinc-400 dark:text-zinc-500">
-              <span className="text-xs">No LoRAs found</span>
-              <button onClick={fetchList} className="text-[10px] text-violet-500 hover:underline mt-1">Refresh</button>
+              <span className="text-xs">{t('loraManager.noLorasFound')}</span>
+              <button onClick={fetchList} className="text-[10px] text-violet-500 hover:underline mt-1">{t('loraManager.refreshLink')}</button>
             </div>
           ) : (
             <div className="py-1">
@@ -569,7 +571,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                         className={`shrink-0 transition-colors ${
                           isFav ? 'text-amber-400' : 'text-zinc-300 dark:text-zinc-600 opacity-0 group-hover:opacity-100'
                         }`}
-                        title={isFav ? 'Remove from favorites' : 'Add to favorites'}
+                        title={isFav ? t('loraManager.favoriteTooltipRemove') : t('loraManager.favoriteTooltipAdd')}
                       >
                         <Star size={12} fill={isFav ? 'currentColor' : 'none'} />
                       </button>
@@ -617,7 +619,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                             >
                               <span className="text-[10px]">{variant.label === 'final' ? '⭐' : '📍'}</span>
                               <span className="text-[10px] font-medium flex-1 truncate">
-                                {variant.label === 'final' ? 'Final' : variant.label}
+                                {variant.label === 'final' ? t('loraManager.variantFinal') : variant.label}
                               </span>
                               {vActive && <Check size={10} className="text-green-500 shrink-0" />}
                             </div>
@@ -637,7 +639,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
           <span className="text-[9px] text-zinc-400 dark:text-zinc-500">
             {filteredLoras.length} LoRA{filteredLoras.length !== 1 ? 's' : ''} · {favorites.size} ★
           </span>
-          <span className="text-[8px] text-zinc-400 dark:text-zinc-500">Right-click for options</span>
+          <span className="text-[8px] text-zinc-400 dark:text-zinc-500">{t('loraManager.rightClickHint')}</span>
         </div>
       </div>
 
@@ -654,14 +656,14 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
               onClick={() => { onUnloadLora(); setContextMenu(null); }}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-red-600 dark:text-red-400 hover:bg-red-50 dark:hover:bg-red-900/20 transition-colors"
             >
-              <X size={12} /> Deactivate
+              <X size={12} /> {t('loraManager.contextDeactivate')}
             </button>
           ) : (
             <button
               onClick={() => { if (contextMenu.variant) handleActivate(contextMenu.lora, contextMenu.variant); }}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-green-600 dark:text-green-400 hover:bg-green-50 dark:hover:bg-green-900/20 transition-colors"
             >
-              <Check size={12} /> Activate
+              <Check size={12} /> {t('loraManager.contextActivate')}
             </button>
           )}
 
@@ -671,7 +673,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
             className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-amber-600 dark:text-amber-400 hover:bg-amber-50 dark:hover:bg-amber-900/20 transition-colors"
           >
             <Star size={12} fill={favorites.has(contextMenu.lora.name) ? 'currentColor' : 'none'} />
-            {favorites.has(contextMenu.lora.name) ? 'Remove Favorite' : 'Add Favorite'}
+            {favorites.has(contextMenu.lora.name) ? t('loraManager.contextRemoveFavorite') : t('loraManager.contextAddFavorite')}
           </button>
 
           <div className="border-t border-zinc-100 dark:border-zinc-700 my-1" />
@@ -684,7 +686,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
             }}
             className="w-full flex items-center gap-2 px-3 py-1.5 text-[11px] text-zinc-600 dark:text-zinc-400 hover:bg-zinc-50 dark:hover:bg-zinc-800/50 transition-colors"
           >
-            <FolderOpen size={12} /> Open in Explorer
+            <FolderOpen size={12} /> {t('loraManager.contextOpenExplorer')}
           </button>
         </div>
       )}
@@ -695,9 +697,9 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
           <div className="bg-white dark:bg-zinc-900 border border-zinc-200 dark:border-zinc-700 rounded-2xl shadow-2xl w-[340px] overflow-hidden">
             {/* Header */}
             <div className="px-5 pt-5 pb-3">
-              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">Activate LoRA</h3>
+              <h3 className="text-sm font-bold text-zinc-900 dark:text-white">{t('loraManager.activationDialogTitle')}</h3>
               <p className="text-[11px] text-zinc-500 dark:text-zinc-400 mt-1">
-                Load <strong className="text-zinc-800 dark:text-zinc-200">{pendingActivation.lora.name}</strong>
+                {t('loraManager.activationLoadLabel')} <strong className="text-zinc-800 dark:text-zinc-200">{pendingActivation.lora.name}</strong>
                 {pendingActivation.variant.label !== 'final' && (
                   <> · <span className="text-purple-500">{pendingActivation.variant.label}</span></>
                 )}
@@ -707,7 +709,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
             {/* Scale slider */}
             <div className="px-5 py-3 space-y-2">
               <div className="flex items-center justify-between">
-                <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">LoRA Scale</span>
+                <span className="text-[10px] font-bold text-zinc-500 dark:text-zinc-400">{t('loraManager.activationScaleLabel')}</span>
                 <span className="text-[11px] font-mono font-bold text-zinc-700 dark:text-zinc-300">{pendingActivation.scale.toFixed(2)}</span>
               </div>
               <input
@@ -743,7 +745,7 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
             {loraLoaded && (
               <div className="px-5 pb-3">
                 <div className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/20 border border-amber-200 dark:border-amber-800/30">
-                  <span className="text-[10px] text-amber-700 dark:text-amber-300">⚠️ Current LoRA will be unloaded first.</span>
+                  <span className="text-[10px] text-amber-700 dark:text-amber-300">{t('loraManager.activationWarnUnload')}</span>
                 </div>
               </div>
             )}
@@ -754,14 +756,14 @@ export const LoraManager: React.FC<LoraManagerProps> = ({
                 onClick={() => setPendingActivation(null)}
                 className="flex-1 py-2 rounded-lg text-xs font-semibold text-zinc-600 dark:text-zinc-400 bg-zinc-100 dark:bg-zinc-800 hover:bg-zinc-200 dark:hover:bg-zinc-700 transition-colors"
               >
-                Cancel
+                {t('cancel')}
               </button>
               <button
                 onClick={confirmActivation}
                 disabled={isLoraLoading}
                 className="flex-1 py-2 rounded-lg text-xs font-bold text-white bg-gradient-to-r from-green-500 to-emerald-600 hover:from-green-600 hover:to-emerald-700 shadow-lg shadow-green-500/20 transition-colors disabled:opacity-40"
               >
-                {isLoraLoading ? 'Loading...' : 'Activate'}
+                {isLoraLoading ? t('loraManager.loadingButton') : t('loraManager.activateButton')}
               </button>
             </div>
           </div>
