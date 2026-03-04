@@ -1,4 +1,4 @@
-import React, { useState, useRef, useEffect, useCallback } from 'react';
+import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
 import { MessageSquare, X, Send, Loader2, Music, Sparkles, ChevronDown, Zap, Code2, ClipboardPaste, FileEdit, Replace, Disc3, Settings2, CheckCircle2, ToggleLeft, ToggleRight, Play, Pause, Square, Volume2, Palette, Plus, SkipForward, SkipBack, Edit3, Check, Trash2, GripVertical, Minimize2, Globe } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
 import { chatWithAssistant, formatParamsForDisplay, ChatMessage, ParsedMusicRequest } from '../services/chatService';
@@ -7,6 +7,111 @@ import { resolveProgression, formatProgressionForGeneration, CHORD_PRESETS, Scal
 import { loadConfig, PROVIDERS } from '../services/llmProviderService';
 import { uiBridge, UIAction } from '../services/uiBridge';
 import type { Song } from '../types';
+
+/**
+ * Lightweight inline markdown renderer for chat messages.
+ * Supports: **bold**, *italic*, `code`, ```code blocks```, • bullet lines, "quoted" style tags
+ */
+function renderMarkdown(text: string): React.ReactNode[] {
+  const lines = text.split('\n');
+  const elements: React.ReactNode[] = [];
+  let inCodeBlock = false;
+  let codeBlockLines: string[] = [];
+  let codeBlockLang = '';
+
+  const renderInline = (line: string, key: string): React.ReactNode => {
+    // Split by inline patterns: **bold**, *italic*, `code`, "style tags"
+    const parts: React.ReactNode[] = [];
+    // Regex to match inline formatting
+    const regex = /(\*\*(.+?)\*\*)|(\*(.+?)\*)|(`([^`]+?)`)|("([^"]{3,})")/g;
+    let lastIndex = 0;
+    let match: RegExpExecArray | null;
+
+    while ((match = regex.exec(line)) !== null) {
+      // Text before match
+      if (match.index > lastIndex) {
+        parts.push(line.slice(lastIndex, match.index));
+      }
+      if (match[1]) {
+        // **bold**
+        parts.push(<strong key={`${key}-b-${match.index}`} className="font-semibold text-white">{match[2]}</strong>);
+      } else if (match[3]) {
+        // *italic*
+        parts.push(<em key={`${key}-i-${match.index}`} className="italic">{match[4]}</em>);
+      } else if (match[5]) {
+        // `code`
+        parts.push(<code key={`${key}-c-${match.index}`} className="bg-zinc-900 text-purple-300 px-1.5 py-0.5 rounded text-[12px] font-mono">{match[6]}</code>);
+      } else if (match[7]) {
+        // "quoted text" — style tags
+        parts.push(<span key={`${key}-q-${match.index}`} className="bg-purple-500/15 text-purple-300 px-1.5 py-0.5 rounded text-[12px] border border-purple-500/20">{match[8]}</span>);
+      }
+      lastIndex = regex.lastIndex;
+    }
+    if (lastIndex < line.length) {
+      parts.push(line.slice(lastIndex));
+    }
+    return parts.length > 0 ? <span key={key}>{parts}</span> : <span key={key}>{line}</span>;
+  };
+
+  for (let i = 0; i < lines.length; i++) {
+    const line = lines[i];
+
+    // Code block start/end
+    if (line.trimStart().startsWith('```')) {
+      if (!inCodeBlock) {
+        inCodeBlock = true;
+        codeBlockLang = line.trimStart().slice(3).trim();
+        codeBlockLines = [];
+        continue;
+      } else {
+        inCodeBlock = false;
+        elements.push(
+          <pre key={`cb-${i}`} className="bg-zinc-900 text-zinc-300 p-2.5 rounded-lg text-[11px] font-mono overflow-x-auto my-1 border border-zinc-700/30">
+            <code>{codeBlockLines.join('\n')}</code>
+          </pre>
+        );
+        continue;
+      }
+    }
+
+    if (inCodeBlock) {
+      codeBlockLines.push(line);
+      continue;
+    }
+
+    // Empty line → spacing
+    if (line.trim() === '') {
+      elements.push(<div key={`sp-${i}`} className="h-1.5" />);
+      continue;
+    }
+
+    // Bullet point lines (• or - at start)
+    if (/^\s*[•\-\*]\s/.test(line)) {
+      const bulletContent = line.replace(/^\s*[•\-\*]\s+/, '');
+      elements.push(
+        <div key={`li-${i}`} className="flex gap-1.5 ml-1">
+          <span className="text-purple-400 flex-shrink-0">•</span>
+          <span>{renderInline(bulletContent, `li-c-${i}`)}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // Regular line
+    elements.push(<div key={`ln-${i}`}>{renderInline(line, `ln-c-${i}`)}</div>);
+  }
+
+  // If code block was never closed
+  if (inCodeBlock && codeBlockLines.length > 0) {
+    elements.push(
+      <pre key="cb-unclosed" className="bg-zinc-900 text-zinc-300 p-2.5 rounded-lg text-[11px] font-mono overflow-x-auto my-1 border border-zinc-700/30">
+        <code>{codeBlockLines.join('\n')}</code>
+      </pre>
+    );
+  }
+
+  return elements;
+}
 
 // Pending actions for a message — each toggleable
 interface PendingActionItem {
@@ -269,17 +374,15 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
     });
     if (applied > 0) {
       const hypeMessages = [
-        '¿Le damos caña y generamos? 🚀',
-        '¿Generamos esto ya o tocamos algo más? 🎵',
-        '¿Quieres ajustar algo más o le damos al play? 🔥',
-        '¿Lo dejamos así de bonito o le metemos más magia? ✨',
-        '¿Lanzamos la generación o le hacemos algún retoque? 🎧',
+        '¿Generamos o ajusto algo más?',
+        '¿Lanzamos la generación?',
+        '¿Algún cambio más antes de generar?',
       ];
       const randomHype = hypeMessages[Math.floor(Math.random() * hypeMessages.length)];
       setMessages(prev => [...prev, {
         id: `action-confirm-${Date.now()}`,
         role: 'system',
-        content: `✅ ¡${applied} ${applied === 1 ? 'cambio aplicado' : 'cambios aplicados'}! Ya lo tienes en el panel 🎶`,
+        content: `✅ ${applied} ${applied === 1 ? 'cambio aplicado' : 'cambios aplicados'}.`,
         timestamp: new Date(),
       }, {
         id: `suggest-${Date.now() + 1}`,
@@ -345,7 +448,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
     setMessages(prev => [...prev, {
       id: `system-${Date.now()}`,
       role: 'system',
-      content: '🎨 ¡Estilo actualizado desde el editor! 🔥',
+      content: '🎨 Estilo actualizado.',
       timestamp: new Date(),
     }]);
   };
@@ -379,13 +482,13 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
       id: `system-${Date.now()}`,
       role: 'system',
       content: mode === 'overwrite'
-        ? '🎨 ¡Estilo aplicado! Echa un vistazo al panel 👀'
-        : '🎨 ¡Estilo añadido al que ya tenías! Combo letal 🔥',
+        ? '🎨 Estilo aplicado en el panel.'
+        : '🎨 Estilo añadido al existente.',
       timestamp: new Date(),
     }, {
       id: `suggest-${Date.now()}`,
       role: 'system',
-      content: '💡 ¿Quieres que le ajuste algo más o generamos directamente? 🚀',
+      content: '💡 ¿Ajusto algo más o generamos?',
       timestamp: new Date(),
     }]);
   };
@@ -962,7 +1065,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                           ? 'bg-zinc-800/50 text-zinc-400 text-[11px] italic border border-zinc-700/30'
                           : 'bg-zinc-800 text-zinc-200 rounded-bl-md border border-zinc-700/30'
                     }`}>
-                      <div className="whitespace-pre-wrap">{msg.content}</div>
+                      <div className="space-y-0.5">{renderMarkdown(msg.content)}</div>
 
                       {/* PENDING Actions — Interactive review panel */}
                       {isPending && (
