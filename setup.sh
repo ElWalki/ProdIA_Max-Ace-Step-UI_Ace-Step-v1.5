@@ -12,7 +12,7 @@ VENV="$ACESTEP_DIR/.venv"
 
 echo ""
 echo "╔══════════════════════════════════════════════════════════╗"
-echo "║          ProdIA pro - Instalacion / Installation          ║"
+echo "║          ProdIA pro - Instalacion / Installation         ║"
 echo "║   Python venv + dependencias + Node.js UI                ║"
 echo "╚══════════════════════════════════════════════════════════╝"
 echo ""
