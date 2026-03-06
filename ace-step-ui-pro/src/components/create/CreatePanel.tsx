@@ -95,9 +95,14 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   // Model status — which models are available in backend checkpoints
   const [availableModels, setAvailableModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
   const [showModelMenu, setShowModelMenu] = useState(false);
+  const [modelLoading, setModelLoading] = useState(false);
+
+  const set = useCallback(<K extends keyof GenerationParams>(key: K, val: GenerationParams[K]) => {
+    setParams(p => ({ ...p, [key]: val }));
+  }, []);
 
   // Fetch available models from backend on mount (scans checkpoints/ on disk)
-  useEffect(() => {
+  const refreshModels = useCallback(() => {
     generateApi.getAllModels().then(r => {
       setAvailableModels(r.models);
       // If no model selected yet, pick the active one or first preloaded
@@ -114,7 +119,28 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
         if (!params.ditModel && r.default_model) set('ditModel', r.default_model);
       }).catch(() => {});
     });
-  }, []);
+  }, [params.ditModel, set]);
+
+  useEffect(() => { refreshModels(); }, []);
+
+  // Load/swap a DiT model when user clicks it
+  const handleLoadModel = useCallback(async (modelName: string) => {
+    set('ditModel', modelName);
+    setShowModelMenu(false);
+    // Only call the load API if the model is on disk and not already active
+    const model = availableModels.find(m => m.name === modelName);
+    if (model?.is_active) return; // already loaded
+    if (!model?.is_preloaded) return; // not on disk, can't load
+    setModelLoading(true);
+    try {
+      await generateApi.loadModel(modelName, token || '');
+      refreshModels();
+    } catch {
+      // Model swap failed — still selected in UI
+    } finally {
+      setModelLoading(false);
+    }
+  }, [availableModels, set, token, refreshModels]);
 
   // LM model size & backend state
   const LM_SIZES = [
@@ -166,10 +192,6 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
       }
     }).catch(() => {});
   }, [token]);
-
-  const set = useCallback(<K extends keyof GenerationParams>(key: K, val: GenerationParams[K]) => {
-    setParams(p => ({ ...p, [key]: val }));
-  }, []);
 
   // Swap LM model handler
   const handleSwapLm = useCallback(async (modelPath: string, backend: string) => {
@@ -427,24 +449,26 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
           <div className="relative">
             <button
               onClick={() => setShowModelMenu(!showModelMenu)}
-              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 border border-surface-300/40 hover:border-accent-500/40 transition-colors text-xs"
+              disabled={modelLoading}
+              className="flex items-center gap-1.5 px-2.5 py-1 rounded-lg bg-surface-100 border border-surface-300/40 hover:border-accent-500/40 transition-colors text-xs disabled:opacity-60"
             >
-              <Cpu className="w-3 h-3 text-surface-400" />
+              {modelLoading
+                ? <RefreshCw className="w-3 h-3 text-accent-400 animate-spin" />
+                : <Cpu className="w-3 h-3 text-surface-400" />
+              }
               <span className="font-semibold text-surface-800">
                 {MODEL_LABELS[params.ditModel || '']?.label || params.ditModel || 'Select'}
               </span>
-              {availableModels.some(m => m.name === params.ditModel && m.is_preloaded) && (
-                <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
-              )}
-              {availableModels.some(m => m.name === params.ditModel && !m.is_preloaded) && (
-                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title={t('create.notDownloaded')} />
+              {availableModels.some(m => m.name === params.ditModel && m.is_active) && (
+                <Check className="w-3 h-3 text-green-400" />
               )}
               <ChevronDown className="w-3 h-3 text-surface-400" />
             </button>
             {showModelMenu && (
-              <div className="absolute left-0 top-full mt-1 w-56 bg-surface-100 border border-surface-300 rounded-xl shadow-2xl z-50 overflow-hidden">
-                <div className="px-3 py-1.5 border-b border-surface-300/40">
+              <div className="absolute left-0 top-full mt-1 w-64 bg-surface-100 border border-surface-300 rounded-xl shadow-2xl z-50 overflow-hidden">
+                <div className="px-3 py-1.5 border-b border-surface-300/40 flex items-center justify-between">
                   <span className="text-[10px] font-semibold text-surface-400 uppercase tracking-wider">{t('create.ditModel', 'Model')}</span>
+                  <span className="text-[10px] text-surface-400">{t('checkpoints.clickToLoad', 'Click to load')}</span>
                 </div>
                 {availableModels.length === 0 && (
                   <div className="px-3 py-3 text-[10px] text-surface-400 text-center">
@@ -454,19 +478,16 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                 {availableModels.map(m => {
                   const info = MODEL_LABELS[m.name];
                   const isSelected = params.ditModel === m.name;
-                  const displayLabel = info?.label || m.name;
-                  const dotColor = info?.color === 'amber' ? 'bg-amber-500'
-                    : info?.color === 'emerald' ? 'bg-emerald-500'
-                    : 'bg-accent-500';
+                  const displayLabel = info?.label || m.name.replace('acestep-v15-', '').replace('acestep-', '');
                   return (
                     <button
                       key={m.name}
-                      onClick={() => { set('ditModel', m.name); setShowModelMenu(false); }}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors ${
+                      onClick={() => handleLoadModel(m.name)}
+                      disabled={modelLoading || !m.is_preloaded}
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors disabled:opacity-40 ${
                         isSelected ? 'bg-accent-500/10' : 'hover:bg-surface-200'
                       }`}
                     >
-                      <span className={`w-2 h-2 rounded-full shrink-0 ${dotColor}`} />
                       <div className="flex-1 min-w-0">
                         <span className={`text-xs font-semibold block ${isSelected ? 'text-accent-400' : 'text-surface-800'}`}>
                           {displayLabel}
@@ -476,9 +497,6 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                       <div className="flex items-center gap-1.5 shrink-0">
                         {m.is_active && (
                           <span className="text-[9px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-medium">{t('settings.loaded', 'Loaded')}</span>
-                        )}
-                        {m.is_preloaded && !m.is_active && (
-                          <span className="text-[9px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-medium">{t('checkpoints.onDisk', 'On disk')}</span>
                         )}
                         {!m.is_preloaded && (
                           <span className="text-[9px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded font-medium">{t('create.notDownloaded', 'Not loaded')}</span>

@@ -409,6 +409,13 @@ const en = {
     onDisk: 'On disk',
     download: 'Download',
     downloadAll: 'Download all missing models',
+    clickToLoad: 'Click to load',
+    custom: 'custom',
+    changePath: 'Change path',
+    pathLabel: 'Checkpoints directory path',
+    pathHint: 'Set a custom path if your checkpoints are on a different drive or directory.',
+    resetPath: 'Reset to default',
+    reset: 'Reset',
   },
 };
 
@@ -819,6 +826,13 @@ const es: typeof en = {
     onDisk: 'En disco',
     download: 'Descargar',
     downloadAll: 'Descargar todos los modelos faltantes',
+    clickToLoad: 'Clic para cargar',
+    custom: 'personalizado',
+    changePath: 'Cambiar ruta',
+    pathLabel: 'Ruta del directorio de checkpoints',
+    pathHint: 'Establece una ruta personalizada si tus checkpoints están en otro disco o directorio.',
+    resetPath: 'Restablecer por defecto',
+    reset: 'Restablecer',
   },
 };
 

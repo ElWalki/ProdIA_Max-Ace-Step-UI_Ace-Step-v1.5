@@ -93,8 +93,16 @@ export const generateApi = {
   }>('/api/generate/models'),
 
   getCheckpointsPath: () => api<{
-    path: string; acestepDir: string; exists: boolean;
+    path: string; acestepDir: string; exists: boolean; isCustom: boolean;
   }>('/api/generate/checkpoints-path'),
+
+  setCheckpointsPath: (newPath: string | null, token: string) =>
+    api<{ path: string; isCustom: boolean; exists?: boolean }>('/api/generate/checkpoints-path', {
+      method: 'POST', body: { path: newPath }, token,
+    }),
+
+  loadModel: (model: string, token: string) =>
+    api<{ status: string; model: string }>('/api/generate/models/load', { method: 'POST', body: { model }, token }),
 
   downloadModel: (modelName: string, token: string) =>
     api<{ status: string; message: string }>('/api/generate/models/download', { method: 'POST', body: { modelName }, token }),

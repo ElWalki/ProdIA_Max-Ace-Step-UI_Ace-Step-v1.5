@@ -784,8 +784,7 @@ router.get('/endpoints', authMiddleware, async (_req: AuthenticatedRequest, res:
 
 router.get('/models', async (_req, res: Response) => {
   try {
-    const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
-    const checkpointsDir = path.join(ACESTEP_DIR, 'checkpoints');
+    const checkpointsDir = resolveCheckpointsDir();
 
     // All known DiT models from Gradio's model_downloader.py registry:
     // - MAIN_MODEL_COMPONENTS includes "acestep-v15-turbo" (bundled with main download)
@@ -864,6 +863,19 @@ router.get('/models', async (_req, res: Response) => {
 // In-memory tracking of active model downloads
 const activeDownloads = new Map<string, { status: 'downloading' | 'done' | 'error'; progress: string; error?: string }>();
 
+// Custom checkpoints path override (set by user via Settings UI)
+let customCheckpointsPath: string | null = null;
+
+function resolveCheckpointsDir(): string {
+  if (customCheckpointsPath) return customCheckpointsPath;
+  const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+  return path.join(ACESTEP_DIR, 'checkpoints');
+}
+
+function resolveAcestepDir(): string {
+  return process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+}
+
 // POST /api/generate/models/download — Download a model from HuggingFace
 router.post('/models/download', async (req: AuthenticatedRequest, res: Response) => {
   try {
@@ -880,7 +892,7 @@ router.post('/models/download', async (req: AuthenticatedRequest, res: Response)
       return;
     }
 
-    const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const ACESTEP_DIR = resolveAcestepDir();
     const pythonPath = resolvePythonPath(ACESTEP_DIR);
     const downloaderScript = path.join(ACESTEP_DIR, 'acestep', 'model_downloader.py');
 
@@ -954,14 +966,63 @@ router.get('/models/download/:modelName', async (req: AuthenticatedRequest, res:
 // GET /api/generate/checkpoints-path — Return the resolved checkpoints directory
 router.get('/checkpoints-path', async (_req, res: Response) => {
   try {
-    const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
-    const checkpointsDir = path.join(ACESTEP_DIR, 'checkpoints');
+    const checkpointsDir = resolveCheckpointsDir();
     const { existsSync } = await import('fs');
     res.json({
       path: checkpointsDir,
-      acestepDir: ACESTEP_DIR,
+      acestepDir: resolveAcestepDir(),
       exists: existsSync(checkpointsDir),
+      isCustom: !!customCheckpointsPath,
     });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/generate/checkpoints-path — Set a custom checkpoints directory
+router.post('/checkpoints-path', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { path: newPath } = req.body;
+    if (!newPath || typeof newPath !== 'string') {
+      // Reset to default
+      customCheckpointsPath = null;
+      res.json({ path: resolveCheckpointsDir(), isCustom: false });
+      return;
+    }
+    const { existsSync } = await import('fs');
+    if (!existsSync(newPath)) {
+      res.status(400).json({ error: 'Directory does not exist' });
+      return;
+    }
+    customCheckpointsPath = newPath;
+    res.json({ path: newPath, isCustom: true, exists: true });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/generate/models/load — Load/swap a DiT model via Gradio
+router.post('/models/load', async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { model } = req.body;
+    if (!model || typeof model !== 'string') {
+      res.status(400).json({ error: 'model name is required' });
+      return;
+    }
+    const apiUrl = config.acestep?.apiUrl || 'http://127.0.0.1:7860';
+    const gradioRes = await fetch(`${apiUrl}/v1/models/load`, {
+      method: 'POST',
+      headers: { 'Content-Type': 'application/json' },
+      body: JSON.stringify({ model }),
+      signal: AbortSignal.timeout(120000), // 2min timeout for model loading
+    });
+    if (!gradioRes.ok) {
+      const err = await gradioRes.text();
+      res.status(gradioRes.status).json({ error: err || 'Failed to load model' });
+      return;
+    }
+    const data = await gradioRes.json();
+    res.json(data);
   } catch (error) {
     res.status(500).json({ error: (error as Error).message });
   }
@@ -976,7 +1037,7 @@ router.post('/models/download-main', async (_req: AuthenticatedRequest, res: Res
       return;
     }
 
-    const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const ACESTEP_DIR = resolveAcestepDir();
     const pythonPath = resolvePythonPath(ACESTEP_DIR);
     const downloaderScript = path.join(ACESTEP_DIR, 'acestep', 'model_downloader.py');
 

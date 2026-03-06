@@ -566,10 +566,13 @@ function ModelInfoTab() {
   const { t } = useTranslation();
   const [status, setStatus] = useState<any>(null);
   const [loading, setLoading] = useState(true);
-  const [checkpointsPath, setCheckpointsPath] = useState<{ path: string; acestepDir: string; exists: boolean } | null>(null);
+  const [checkpointsPath, setCheckpointsPath] = useState<{ path: string; acestepDir: string; exists: boolean; isCustom: boolean } | null>(null);
   const [allModels, setAllModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
   const [scanning, setScanning] = useState(false);
   const [downloads, setDownloads] = useState<Record<string, { status: string; progress: string; error?: string }>>({});
+  const [editingPath, setEditingPath] = useState(false);
+  const [customPath, setCustomPath] = useState('');
+  const [pathError, setPathError] = useState('');
 
   const fetchModels = useCallback(async () => {
     setScanning(true);
@@ -636,6 +639,28 @@ function ModelInfoTab() {
       await fetch('/api/generate/models/download-main', { method: 'POST', headers: { 'Content-Type': 'application/json' } });
     } catch { /* ignore */ }
   }, [t]);
+
+  const saveCustomPath = useCallback(async () => {
+    setPathError('');
+    try {
+      const r = await fetch('/api/generate/checkpoints-path', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ path: customPath || null }),
+      });
+      if (!r.ok) {
+        const err = await r.json();
+        setPathError(err.error || 'Invalid path');
+        return;
+      }
+      const data = await r.json();
+      setCheckpointsPath(prev => prev ? { ...prev, path: data.path, isCustom: data.isCustom } : prev);
+      setEditingPath(false);
+      fetchModels(); // Re-scan with new path
+    } catch {
+      setPathError('Connection error');
+    }
+  }, [customPath, fetchModels]);
 
   if (loading) {
     return (
@@ -727,21 +752,72 @@ function ModelInfoTab() {
           </div>
           <div className="flex-1 min-w-0">
             <h3 className="text-sm font-semibold text-surface-900">{t('checkpoints.title', 'Checkpoints')}</h3>
-            <p className="text-[10px] text-surface-400 truncate" title={checkpointsPath?.path || ''}>
-              {checkpointsPath?.path || t('checkpoints.unknown', 'Unknown path')}
+            {!editingPath && (
+              <p className="text-[10px] text-surface-400 truncate" title={checkpointsPath?.path || ''}>
+                {checkpointsPath?.path || t('checkpoints.unknown', 'Unknown path')}
+                {checkpointsPath?.isCustom && (
+                  <span className="ml-1 text-accent-400">({t('checkpoints.custom', 'custom')})</span>
+                )}
+              </p>
+            )}
+          </div>
+          <div className="flex items-center gap-1.5 shrink-0">
+            <button
+              onClick={() => { setEditingPath(!editingPath); setCustomPath(checkpointsPath?.path || ''); setPathError(''); }}
+              className="p-1.5 rounded-lg text-surface-400 hover:text-surface-700 hover:bg-surface-200 transition-colors"
+              title={t('checkpoints.changePath', 'Change path')}
+            >
+              <Settings className="w-3.5 h-3.5" />
+            </button>
+            <button
+              onClick={fetchModels}
+              disabled={scanning}
+              className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
+                bg-surface-200/60 text-surface-700 hover:bg-surface-300 transition-colors disabled:opacity-50"
+              title={t('checkpoints.rescan', 'Rescan checkpoints')}
+            >
+              <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} />
+              {t('checkpoints.rescan', 'Rescan')}
+            </button>
+          </div>
+        </div>
+
+        {/* Custom path editor */}
+        {editingPath && (
+          <div className="space-y-2">
+            <label className="block text-xs font-medium text-surface-500">
+              {t('checkpoints.pathLabel', 'Checkpoints directory path')}
+            </label>
+            <div className="flex gap-2">
+              <input
+                type="text"
+                value={customPath}
+                onChange={e => setCustomPath(e.target.value)}
+                placeholder={checkpointsPath?.acestepDir ? `${checkpointsPath.acestepDir}/checkpoints` : '/path/to/checkpoints'}
+                className="flex-1 px-3 py-2 text-sm rounded-lg bg-surface-200 border border-surface-300/40 text-surface-900 placeholder:text-surface-400"
+              />
+              <button
+                onClick={saveCustomPath}
+                className="px-3 py-2 rounded-lg text-xs font-semibold bg-accent-500 text-white hover:bg-accent-400 transition-colors"
+              >
+                {t('common.save', 'Save')}
+              </button>
+              {checkpointsPath?.isCustom && (
+                <button
+                  onClick={() => { setCustomPath(''); saveCustomPath(); }}
+                  className="px-3 py-2 rounded-lg text-xs font-medium bg-surface-200/60 text-surface-700 hover:bg-surface-300 transition-colors"
+                  title={t('checkpoints.resetPath', 'Reset to default')}
+                >
+                  {t('checkpoints.reset', 'Reset')}
+                </button>
+              )}
+            </div>
+            {pathError && <p className="text-[10px] text-red-400">{pathError}</p>}
+            <p className="text-[10px] text-surface-400">
+              {t('checkpoints.pathHint', 'Set a custom path if your checkpoints are on a different drive or directory.')}
             </p>
           </div>
-          <button
-            onClick={fetchModels}
-            disabled={scanning}
-            className="flex items-center gap-1.5 px-2.5 py-1.5 rounded-lg text-xs font-medium
-              bg-surface-200/60 text-surface-700 hover:bg-surface-300 transition-colors disabled:opacity-50"
-            title={t('checkpoints.rescan', 'Rescan checkpoints')}
-          >
-            <RefreshCw className={`w-3.5 h-3.5 ${scanning ? 'animate-spin' : ''}`} />
-            {t('checkpoints.rescan', 'Rescan')}
-          </button>
-        </div>
+        )}
 
         {/* Checkpoints path status */}
         {checkpointsPath && !checkpointsPath.exists && (
