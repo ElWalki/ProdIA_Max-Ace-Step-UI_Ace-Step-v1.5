@@ -93,18 +93,27 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   };
 
   // Model status — which models are available in backend checkpoints
-  const [availableModels, setAvailableModels] = useState<{ name: string; is_default: boolean }[]>([]);
+  const [availableModels, setAvailableModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
   const [showModelMenu, setShowModelMenu] = useState(false);
 
-  // Fetch available models from backend on mount
+  // Fetch available models from backend on mount (scans checkpoints/ on disk)
   useEffect(() => {
-    generateApi.getLoadedModels().then(r => {
+    generateApi.getAllModels().then(r => {
       setAvailableModels(r.models);
-      // If no model selected yet, pick the default
-      if (!params.ditModel && r.default_model) {
-        set('ditModel', r.default_model);
+      // If no model selected yet, pick the active one or first preloaded
+      if (!params.ditModel) {
+        const active = r.models.find(m => m.is_active);
+        const preloaded = r.models.find(m => m.is_preloaded);
+        if (active) set('ditModel', active.name);
+        else if (preloaded) set('ditModel', preloaded.name);
       }
-    }).catch(() => {});
+    }).catch(() => {
+      // Fallback: try Gradio /v1/models for the loaded model
+      generateApi.getLoadedModels().then(r => {
+        setAvailableModels(r.models.map(m => ({ name: m.name, is_active: m.is_default, is_preloaded: true })));
+        if (!params.ditModel && r.default_model) set('ditModel', r.default_model);
+      }).catch(() => {});
+    });
   }, []);
 
   // LM model size & backend state
@@ -424,8 +433,11 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
               <span className="font-semibold text-surface-800">
                 {MODEL_LABELS[params.ditModel || '']?.label || params.ditModel || 'Select'}
               </span>
-              {availableModels.some(m => m.name === params.ditModel) && (
+              {availableModels.some(m => m.name === params.ditModel && m.is_preloaded) && (
                 <span className="w-1.5 h-1.5 rounded-full bg-green-500" />
+              )}
+              {availableModels.some(m => m.name === params.ditModel && !m.is_preloaded) && (
+                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" title={t('create.notDownloaded')} />
               )}
               <ChevronDown className="w-3 h-3 text-surface-400" />
             </button>
@@ -462,8 +474,14 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                         <span className="text-[10px] text-surface-400 block truncate">{m.name}</span>
                       </div>
                       <div className="flex items-center gap-1.5 shrink-0">
-                        {m.is_default && (
+                        {m.is_active && (
                           <span className="text-[9px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-medium">{t('settings.loaded', 'Loaded')}</span>
+                        )}
+                        {m.is_preloaded && !m.is_active && (
+                          <span className="text-[9px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-medium">{t('checkpoints.onDisk', 'On disk')}</span>
+                        )}
+                        {!m.is_preloaded && (
+                          <span className="text-[9px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded font-medium">{t('create.notDownloaded', 'Not loaded')}</span>
                         )}
                         {isSelected && <Check className="w-3 h-3 text-accent-400" />}
                       </div>
