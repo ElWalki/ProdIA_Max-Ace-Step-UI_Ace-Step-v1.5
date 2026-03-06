@@ -404,7 +404,6 @@ router.post('/list', authMiddleware, async (req: AuthenticatedRequest, res: Resp
         const customEntries = scanLibrary(customDir);
         allEntries.push(...customEntries);
       }
-      allEntries.push(...customEntries);
     }
 
     res.json({ loras: allEntries, defaultDirectory: defaultLibraryDir });

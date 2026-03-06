@@ -1216,8 +1216,8 @@ router.post('/list-audio-folder', authMiddleware, async (req: AuthenticatedReque
 router.post('/extract-codes', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
     const { audioUrl } = req.body as { audioUrl?: string };
-    if (!audioUrl) {
-      return res.status(400).json({ error: 'audioUrl is required' });
+    if (!audioUrl || typeof audioUrl !== 'string') {
+      return res.status(400).json({ error: 'audioUrl is required and must be a string' });
     }
 
     // Resolve the stored audio URL to a local file path

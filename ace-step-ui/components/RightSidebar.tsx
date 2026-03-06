@@ -8,6 +8,7 @@ import { SongDropdownMenu } from './SongDropdownMenu';
 import { ShareModal } from './ShareModal';
 import { AlbumCover } from './AlbumCover';
 import { GenerationConfigModal } from './GenerationConfigModal';
+import { StemSeparationModal } from './StemSeparationModal';
 
 interface RightSidebarProps {
     song: Song | null;
@@ -40,6 +41,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
     const [titleError, setTitleError] = useState<string | null>(null);
     const [isSavingTitle, setIsSavingTitle] = useState(false);
     const [configOpen, setConfigOpen] = useState(false);
+    const [stemModalOpen, setStemModalOpen] = useState(false);
 
     useEffect(() => {
         if (song) {
@@ -265,6 +267,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                                     onClose={() => setShowMenu(false)}
                                     isOwner={isOwner}
                                     onCreateVideo={onOpenVideo}
+                                    onExtractStems={() => setStemModalOpen(true)}
                                     onReusePrompt={() => onReuse?.(song)}
                                     onDelete={() => onDelete?.(song)}
                                     onAddToPlaylist={() => onAddToPlaylist?.(song)}
@@ -318,14 +321,7 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                             <Repeat size={18} strokeWidth={1.5} />
                         </button>
                         <button
-                            onClick={() => {
-                                if (!song?.audioUrl) return;
-                                const baseUrl = window.location.port === '3000'
-                                    ? `${window.location.protocol}//${window.location.hostname}:3001`
-                                    : window.location.origin;
-                                const audioUrl = song.audioUrl.startsWith('http') ? song.audioUrl : `${baseUrl}${song.audioUrl}`;
-                                window.open(`${baseUrl}/demucs-web/?audioUrl=${encodeURIComponent(audioUrl)}`, '_blank');
-                            }}
+                            onClick={() => setStemModalOpen(true)}
                             title={t('extractStems')}
                             className="p-3 text-zinc-500 hover:text-zinc-900 dark:text-zinc-400 dark:hover:text-white hover:bg-zinc-300/50 dark:hover:bg-white/10 rounded-xl transition-colors duration-150"
                         >
@@ -551,6 +547,13 @@ export const RightSidebar: React.FC<RightSidebarProps> = ({ song, onClose, onOpe
                     token={token}
                     isOpen={configOpen}
                     onClose={() => setConfigOpen(false)}
+                />
+            )}
+            {song && (
+                <StemSeparationModal
+                    isOpen={stemModalOpen}
+                    onClose={() => setStemModalOpen(false)}
+                    song={song}
                 />
             )}
         </div>

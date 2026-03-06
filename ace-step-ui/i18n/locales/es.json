@@ -278,7 +278,15 @@
         "agentMode": "Agente",
         "instructorMode": "Instructor",
         "agentModeTooltip": "Modo agente: la IA aplica cambios directamente",
-        "instructorModeTooltip": "Modo instructor: la IA solo explica, sin aplicar"
+        "instructorModeTooltip": "Modo instructor: la IA solo explica, sin aplicar",
+        "scrollToBottom": "Ir abajo",
+        "scrollWriting": "Escribiendo...",
+        "welcomeMessage": "Asistente de producción musical — ProdIA Pro\n\nTengo control total sobre ACE-Step. Puedo configurar parámetros, generar música y ajustar cualquier aspecto de tu producción.\n\nEjemplos:\n• \"Hazme un reggaetón a 95 bpm\"\n• \"Quiero una balada de rock en español\"\n• \"Sube la calidad al máximo\"\n• \"¿Qué modelo me recomiendas?\"",
+        "generatingStatus": "Generando...",
+        "generateTooltip": "Generar con la configuración actual",
+        "formatActionDefault": "acción",
+        "songDropSingle": "📎 He cargado una canción como contexto:\n\n{{context}}\n\n¿Qué quieres hacer con ella? Puedo:\n• Analizar sus parámetros y composición\n• Sugerir mejoras de letra o estilo\n• Generar una canción similar\n• Modificar parámetros específicos\n\n💡 Puedes arrastrar hasta 3 canciones para combinarlas.",
+        "songDropMulti": "📎 He añadido la Canción {{slot}} al contexto ({{total}}/3 slots):\n\n{{context}}\n\nAhora tengo {{total}} canciones cargadas. Puedo:\n• Fusionar estilos de las {{total}} canciones\n• Usar la letra de una + el estilo de otra\n• Tomar el BPM/key de una y aplicarlo a otra\n• Crear algo totalmente nuevo basado en todas\n\n¿Qué combinación quieres?"
     },
     "chordEditor": {
         "panelTitle": "Progresión de Acordes",

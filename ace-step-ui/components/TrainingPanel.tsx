@@ -126,6 +126,9 @@ export const TrainingPanel: React.FC = () => {
   const [editInstrumental, setEditInstrumental] = useState(true);
   const [editRawLyrics, setEditRawLyrics] = useState('');
 
+  // BPM/Key detection state
+  const [detectingBpmKey, setDetectingBpmKey] = useState(false);
+
   // Dataset save state
   const [savePath, setSavePath] = useState('./datasets/my_lora_dataset.json');
   const [saveStatus, setSaveStatus] = useState('');
@@ -448,6 +451,27 @@ export const TrainingPanel: React.FC = () => {
       setSaving(false);
     }
   }, [token, currentSampleIdx, editCaption, editGenre, editPromptOverride, editLyrics, editBpm, editKey, editTimeSig, editLanguage, editInstrumental, t, markStep]);
+
+  // === Detect BPM & Key from audio ===
+  const handleDetectBpmKey = useCallback(async () => {
+    if (!token || !currentSample || detectingBpmKey) return;
+    const audioPath = typeof currentSample.audio === 'string'
+      ? currentSample.audio
+      : (currentSample.audio as Record<string, unknown>)?.path as string | undefined;
+    if (!audioPath) return;
+    setDetectingBpmKey(true);
+    try {
+      const result = await trainingApi.detectBpmKey(audioPath, token);
+      if (result.success) {
+        setEditBpm(result.bpm);
+        setEditKey(result.key_scale || `${result.key} ${result.mode}`);
+      }
+    } catch (err) {
+      console.error('BPM/Key detection failed:', err);
+    } finally {
+      setDetectingBpmKey(false);
+    }
+  }, [token, currentSample, detectingBpmKey]);
 
   // === Update settings ===
   const handleUpdateSettings = useCallback(async () => {
@@ -956,6 +980,17 @@ export const TrainingPanel: React.FC = () => {
                         <input type="text" value={editKey} onChange={e => setEditKey(e.target.value)} className="w-full bg-white/5 border border-white/10 rounded-lg px-3 py-1.5 text-sm text-zinc-200 focus:outline-none focus:border-violet-500/50" placeholder="e.g. C major" />
                       </div>
                     </div>
+                    <button
+                      onClick={handleDetectBpmKey}
+                      disabled={detectingBpmKey || !currentSample}
+                      className="w-full flex items-center justify-center gap-1.5 px-3 py-1.5 text-xs font-medium rounded-lg bg-violet-600/20 hover:bg-violet-600/30 border border-violet-500/30 text-violet-400 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+                    >
+                      {detectingBpmKey ? (
+                        <><Loader2 className="w-3 h-3 animate-spin" /> Detecting...</>
+                      ) : (
+                        <><Music2 className="w-3 h-3" /> Detect BPM &amp; Key from audio</>
+                      )}
+                    </button>
                     <div className="grid grid-cols-3 gap-2">
                       <div>
                         <label className="text-[11px] text-zinc-500 mb-0.5 block">Time Sig</label>

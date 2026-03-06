@@ -1320,10 +1320,10 @@ router.post('/auto-label-single', authMiddleware, async (req: AuthenticatedReque
   }
 });
 
-// POST /api/training/separate-stems — Separate audio into vocal + instrumental using Demucs
+// POST /api/training/separate-stems — Separate audio into stems using Demucs or UVR (MDX-Net)
 router.post('/separate-stems', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
   try {
-    const { audioPath, quality = 'alta' } = req.body;
+    const { audioPath, quality = 'alta', backend = 'demucs', model, stems = 2 } = req.body;
 
     if (!audioPath || typeof audioPath !== 'string') {
       res.status(400).json({ error: 'audioPath is required' });
@@ -1357,19 +1357,70 @@ router.post('/separate-stems', authMiddleware, async (req: AuthenticatedRequest,
 
     const pythonPath = resolvePythonPath(aceStepDir);
 
-    // Validate quality parameter
+    // Validate parameters
     const validQualities = ['rapida', 'alta', 'maxima'];
     const safeQuality = validQualities.includes(quality) ? quality : 'alta';
+    const validBackends = ['demucs', 'uvr'];
+    const safeBackend = validBackends.includes(backend) ? backend : 'demucs';
+    const safeStems = [2, 4].includes(Number(stems)) ? Number(stems) : 2;
 
-    console.log(`[Training] Separating stems: ${resolvedAudio} (quality: ${safeQuality})`);
+    // --- Cache check: skip re-processing if stems already exist ---
+    const baseName = path.basename(resolvedAudio, path.extname(resolvedAudio));
+    const cachePrefix = `${baseName}_`;
+    const expectedStems = safeStems >= 4
+      ? ['vocals', 'drums', 'bass', 'other']
+      : ['vocals', 'instrumental'];
+    const cachedEntries: Record<string, { url: string; path: string; filename: string }> = {};
+    let allCached = true;
+    for (const stemName of expectedStems) {
+      const stemFile = `${cachePrefix}${stemName}.wav`;
+      const stemFullPath = path.join(stemsDir, stemFile);
+      if (existsSync(stemFullPath)) {
+        cachedEntries[stemName] = {
+          url: `/audio/stems/${stemFile}`,
+          path: stemFullPath,
+          filename: stemFile,
+        };
+      } else {
+        allCached = false;
+        break;
+      }
+    }
 
-    const child = spawn(pythonPath, [
+    if (allCached && !req.body.force) {
+      console.log(`[Training] Using cached stems for: ${baseName}`);
+      const response: any = {
+        success: true,
+        cached: true,
+        backend: safeBackend,
+        stemCount: Object.keys(cachedEntries).length,
+        allStems: cachedEntries,
+        elapsed: 0,
+      };
+      if (cachedEntries.vocals) response.vocals = cachedEntries.vocals;
+      if (cachedEntries.instrumental) response.instrumental = cachedEntries.instrumental;
+      res.json(response);
+      return;
+    }
+
+    console.log(`[Training] Separating stems: ${resolvedAudio} (backend: ${safeBackend}, quality: ${safeQuality}, stems: ${safeStems}${model ? ', model: ' + model : ''})`);
+
+    const pyArgs = [
       scriptPath,
       '--audio', resolvedAudio,
       '--output', stemsDir,
+      '--backend', safeBackend,
       '--quality', safeQuality,
+      '--stems', String(safeStems),
       '--json',
-    ], {
+    ];
+
+    // Add model flag for UVR backend
+    if (safeBackend === 'uvr' && model && typeof model === 'string') {
+      pyArgs.push('--model', model);
+    }
+
+    const child = spawn(pythonPath, pyArgs, {
       cwd: aceStepDir,
       env: { ...process.env },
     });
@@ -1384,7 +1435,7 @@ router.post('/separate-stems', authMiddleware, async (req: AuthenticatedRequest,
       const lines = text.split('\n').filter((l: string) => l.trim());
       for (const line of lines) {
         if (!line.startsWith('{')) {
-          console.log(`[Demucs] ${line}`);
+          console.log(`[Separator] ${line}`);
         }
       }
     });
@@ -1395,7 +1446,7 @@ router.post('/separate-stems', authMiddleware, async (req: AuthenticatedRequest,
 
     child.on('close', (code: number | null) => {
       if (code !== 0) {
-        console.error(`[Training] Demucs exited with code ${code}:`, stderr);
+        console.error(`[Training] Separator exited with code ${code}:`, stderr);
         res.status(500).json({ error: `Separation failed (exit code ${code})`, details: stderr.slice(-500) });
         return;
       }
@@ -1412,38 +1463,361 @@ router.post('/separate-stems', authMiddleware, async (req: AuthenticatedRequest,
         }
 
         // Convert absolute paths to relative URLs for the frontend
-        const vocalsFilename = path.basename(result.vocals_path);
-        const instrumentalFilename = path.basename(result.instrumental_path);
+        // result.stems is a dict: { vocals: path, instrumental: path, drums?: path, bass?: path, other?: path }
+        const stemEntries: Record<string, { url: string; path: string; filename: string }> = {};
+        for (const [stemName, stemPath] of Object.entries(result.stems as Record<string, string>)) {
+          const filename = path.basename(stemPath);
+          stemEntries[stemName] = {
+            url: `/audio/stems/${filename}`,
+            path: stemPath,
+            filename,
+          };
+        }
 
-        res.json({
+        // Backward-compatible response: always include top-level vocals/instrumental if present
+        const response: any = {
           success: true,
-          vocals: {
-            url: `/audio/stems/${vocalsFilename}`,
-            path: result.vocals_path,
-            filename: vocalsFilename,
-          },
-          instrumental: {
-            url: `/audio/stems/${instrumentalFilename}`,
-            path: result.instrumental_path,
-            filename: instrumentalFilename,
-          },
+          backend: result.backend,
+          stemCount: result.stem_count,
+          allStems: stemEntries,
           duration: result.duration,
           elapsed: result.elapsed_seconds,
-        });
+        };
+
+        // Add top-level convenient accessors for backward compat
+        if (stemEntries.vocals) response.vocals = stemEntries.vocals;
+        if (stemEntries.instrumental) response.instrumental = stemEntries.instrumental;
+
+        res.json(response);
       } catch (parseErr) {
-        console.error('[Training] Failed to parse Demucs output:', stdout);
+        console.error('[Training] Failed to parse separator output:', stdout);
         res.status(500).json({ error: 'Failed to parse separation result' });
       }
     });
 
     child.on('error', (err: Error) => {
-      console.error('[Training] Failed to spawn Demucs:', err);
+      console.error('[Training] Failed to spawn separator:', err);
       res.status(500).json({ error: `Failed to start separator: ${err.message}` });
     });
 
   } catch (error) {
     console.error('[Training] Separate-stems error:', error);
     res.status(500).json({ error: error instanceof Error ? error.message : 'Separation failed' });
+  }
+});
+
+// GET /api/training/separator-models — List available UVR models
+router.get('/separator-models', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const models = [
+      { name: 'UVR-MDX-NET-Inst_HQ_3', description: 'MDX-Net Inst HQ 3 — best overall', stems: 2 },
+      { name: 'UVR-MDX-NET-Voc_FT', description: 'MDX-Net Vocal FT — vocal-focused', stems: 2 },
+      { name: 'UVR_MDXNET_KARA_2', description: 'MDX-Net Karaoke 2 — karaoke-grade', stems: 2 },
+      { name: 'Kim_Vocal_2', description: 'Kim Vocal 2 — popular vocal extraction', stems: 2 },
+      { name: 'UVR-MDX-NET-Inst_3', description: 'MDX-Net Inst 3 — clean instrumental', stems: 2 },
+    ];
+    res.json({ models });
+  } catch (error) {
+    res.status(500).json({ error: 'Failed to list models' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+//  POST /api/training/detect-bpm-key — Detect BPM and musical key from audio
+// ---------------------------------------------------------------------------
+router.post('/detect-bpm-key', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { audioPath, normalizeBpm = true } = req.body;
+
+    if (!audioPath || typeof audioPath !== 'string') {
+      res.status(400).json({ error: 'audioPath is required' });
+      return;
+    }
+
+    const aceStepDir = getAceStepDir();
+
+    // Resolve audio path (support /audio/ prefix, relative, or absolute)
+    let resolvedAudio = audioPath;
+    if (audioPath.startsWith('/audio/')) {
+      resolvedAudio = path.join(__dirname, '../../public', audioPath);
+    } else if (!path.isAbsolute(audioPath)) {
+      resolvedAudio = path.resolve(aceStepDir, audioPath);
+    }
+
+    if (!existsSync(resolvedAudio)) {
+      res.status(404).json({ error: `Audio file not found: ${audioPath}` });
+      return;
+    }
+
+    const scriptPath = path.resolve(__dirname, '../../scripts/detect_bpm_key.py');
+    if (!existsSync(scriptPath)) {
+      res.status(500).json({ error: 'detect_bpm_key.py script not found' });
+      return;
+    }
+
+    const pythonPath = resolvePythonPath(aceStepDir);
+
+    console.log(`[Training] Detecting BPM/Key: ${path.basename(resolvedAudio)}`);
+
+    const pyArgs = [
+      scriptPath,
+      '--audio', resolvedAudio,
+      '--json',
+    ];
+    if (!normalizeBpm) {
+      pyArgs.push('--no-normalize-bpm');
+    }
+
+    const child = spawn(pythonPath, pyArgs, {
+      cwd: aceStepDir,
+      env: { ...process.env },
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data: Buffer) => { stdout += data.toString(); });
+    child.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+    child.on('close', (code: number | null) => {
+      if (code !== 0) {
+        console.error(`[Training] BPM/Key detection failed (code ${code}):`, stderr);
+        res.status(500).json({ error: `Detection failed (exit code ${code})`, details: stderr.slice(-500) });
+        return;
+      }
+
+      try {
+        const lines = stdout.trim().split('\n');
+        const jsonLine = lines[lines.length - 1];
+        const result = JSON.parse(jsonLine);
+
+        if (!result.success) {
+          res.status(500).json({ error: result.error || 'Detection failed' });
+          return;
+        }
+
+        console.log(`[Training] BPM/Key detected: BPM=${result.bpm} Key=${result.key_scale} (${result.confidence}%)`);
+        res.json(result);
+      } catch (parseErr) {
+        console.error('[Training] Failed to parse BPM/Key output:', stdout);
+        res.status(500).json({ error: 'Failed to parse detection result' });
+      }
+    });
+
+    child.on('error', (err: Error) => {
+      console.error('[Training] Failed to spawn BPM/Key detector:', err);
+      res.status(500).json({ error: `Failed to start detector: ${err.message}` });
+    });
+
+  } catch (error) {
+    console.error('[Training] Detect-BPM-Key error:', error);
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Detection failed' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+//  POST /api/training/detect-bpm-key-batch — Detect BPM/key for all samples in a dataset
+// ---------------------------------------------------------------------------
+router.post('/detect-bpm-key-batch', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { audioPaths } = req.body as { audioPaths?: string[] };
+
+    if (!audioPaths || !Array.isArray(audioPaths) || audioPaths.length === 0) {
+      res.status(400).json({ error: 'audioPaths array is required' });
+      return;
+    }
+
+    const aceStepDir = getAceStepDir();
+    const scriptPath = path.resolve(__dirname, '../../scripts/detect_bpm_key.py');
+    if (!existsSync(scriptPath)) {
+      res.status(500).json({ error: 'detect_bpm_key.py script not found' });
+      return;
+    }
+
+    const pythonPath = resolvePythonPath(aceStepDir);
+
+    // Resolve all paths
+    const resolvedPaths = audioPaths.map(p => {
+      if (p.startsWith('/audio/')) return path.join(__dirname, '../../public', p);
+      if (!path.isAbsolute(p)) return path.resolve(aceStepDir, p);
+      return p;
+    }).filter(p => existsSync(p));
+
+    if (resolvedPaths.length === 0) {
+      res.status(404).json({ error: 'No valid audio files found' });
+      return;
+    }
+
+    console.log(`[Training] Batch BPM/Key detection: ${resolvedPaths.length} files`);
+
+    const pyArgs = [
+      scriptPath,
+      '--audio', resolvedPaths.join(','),
+      '--json',
+    ];
+
+    const child = spawn(pythonPath, pyArgs, {
+      cwd: aceStepDir,
+      env: { ...process.env },
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data: Buffer) => {
+      const text = data.toString();
+      stdout += text;
+      // Log progress
+      const lines = text.split('\n').filter((l: string) => l.trim() && !l.startsWith('{'));
+      for (const line of lines) {
+        console.log(`[BPM/Key] ${line}`);
+      }
+    });
+    child.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+    child.on('close', (code: number | null) => {
+      if (code !== 0) {
+        res.status(500).json({ error: `Batch detection failed (exit code ${code})`, details: stderr.slice(-500) });
+        return;
+      }
+
+      try {
+        const lines = stdout.trim().split('\n');
+        const jsonLine = lines[lines.length - 1];
+        const result = JSON.parse(jsonLine);
+        res.json(result);
+      } catch (parseErr) {
+        res.status(500).json({ error: 'Failed to parse batch detection result' });
+      }
+    });
+
+    child.on('error', (err: Error) => {
+      res.status(500).json({ error: `Failed to start detector: ${err.message}` });
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Batch detection failed' });
+  }
+});
+
+// ---------------------------------------------------------------------------
+//  POST /api/training/transcribe-enhanced — Enhanced Whisper transcription
+//  with anti-hallucination, structure detection, and faster-whisper support
+// ---------------------------------------------------------------------------
+router.post('/transcribe-enhanced', authMiddleware, async (req: AuthenticatedRequest, res: Response) => {
+  try {
+    const { audioPath, model = 'base', language, structure = false, backend = 'auto' } = req.body;
+
+    if (!audioPath || typeof audioPath !== 'string') {
+      res.status(400).json({ error: 'audioPath is required' });
+      return;
+    }
+
+    const aceStepDir = getAceStepDir();
+
+    // Resolve audio path
+    let resolvedAudio = audioPath;
+    if (audioPath.startsWith('/audio/')) {
+      resolvedAudio = path.join(__dirname, '../../public', audioPath);
+    } else if (audioPath.startsWith('http')) {
+      try {
+        const parsed = new URL(audioPath);
+        if (parsed.pathname.startsWith('/audio/')) {
+          resolvedAudio = path.join(__dirname, '../../public', parsed.pathname);
+        }
+      } catch { /* fall through */ }
+    } else if (!path.isAbsolute(audioPath)) {
+      resolvedAudio = path.resolve(aceStepDir, audioPath);
+    }
+
+    if (!existsSync(resolvedAudio)) {
+      res.status(404).json({ error: `Audio file not found: ${audioPath}` });
+      return;
+    }
+
+    const scriptPath = path.resolve(__dirname, '../../scripts/whisper_transcribe.py');
+    if (!existsSync(scriptPath)) {
+      res.status(500).json({ error: 'whisper_transcribe.py script not found' });
+      return;
+    }
+
+    const pythonPath = resolvePythonPath(aceStepDir);
+
+    const validModels = ['tiny', 'base', 'small', 'medium', 'large', 'large-v2', 'large-v3', 'turbo'];
+    const safeModel = validModels.includes(model) ? model : 'base';
+    const validBackends = ['auto', 'openai', 'faster'];
+    const safeBackend = validBackends.includes(backend) ? backend : 'auto';
+
+    console.log(`[Training] Enhanced transcription: ${path.basename(resolvedAudio)} (model=${safeModel}, backend=${safeBackend}, structure=${structure})`);
+
+    const pyArgs = [
+      scriptPath,
+      '--audio', resolvedAudio,
+      '--model', safeModel,
+      '--backend', safeBackend,
+      '--json',
+    ];
+    if (language) pyArgs.push('--language', language);
+    if (structure) pyArgs.push('--structure');
+
+    const child = spawn(pythonPath, pyArgs, {
+      cwd: aceStepDir,
+      env: { ...process.env, PYTHONIOENCODING: 'utf-8' },
+    });
+
+    let stdout = '';
+    let stderr = '';
+
+    child.stdout.on('data', (data: Buffer) => {
+      const text = data.toString();
+      stdout += text;
+      const lines = text.split('\n').filter((l: string) => l.trim() && !l.startsWith('{'));
+      for (const line of lines) {
+        console.log(`[Whisper] ${line}`);
+      }
+    });
+    child.stderr.on('data', (data: Buffer) => { stderr += data.toString(); });
+
+    child.on('close', (code: number | null) => {
+      if (code !== 0) {
+        console.error(`[Training] Whisper failed (code ${code}):`, stderr);
+        res.status(500).json({ error: `Transcription failed (exit code ${code})`, details: stderr.slice(-500) });
+        return;
+      }
+
+      try {
+        const lines = stdout.trim().split('\n');
+        const jsonLine = lines[lines.length - 1];
+        const result = JSON.parse(jsonLine);
+
+        if (!result.success) {
+          res.status(500).json({ error: result.error || 'Transcription failed' });
+          return;
+        }
+
+        console.log(`[Training] Transcription done: ${result.segment_count} segments, ${result.filtered_count} filtered (${result.elapsed_seconds}s)`);
+        res.json({
+          transcript: result.text,
+          structured_transcript: result.structured_text,
+          language: result.language,
+          segments: result.segment_count,
+          filtered: result.filtered_count,
+          backend: result.backend,
+          model: result.model,
+          elapsed: result.elapsed_seconds,
+        });
+      } catch (parseErr) {
+        console.error('[Training] Failed to parse Whisper output:', stdout);
+        res.status(500).json({ error: 'Failed to parse transcription result' });
+      }
+    });
+
+    child.on('error', (err: Error) => {
+      res.status(500).json({ error: `Failed to start Whisper: ${err.message}` });
+    });
+
+  } catch (error) {
+    res.status(500).json({ error: error instanceof Error ? error.message : 'Transcription failed' });
   }
 });
 

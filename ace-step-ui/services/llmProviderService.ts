@@ -210,16 +210,88 @@ export async function sendChat(
   }
 }
 
+/**
+ * Send a chat completion request with streaming (token-by-token via SSE).
+ * Currently supported: OpenAI-compatible (LM Studio, Ollama, Custom).
+ * Gemini & Claude fall back to non-streaming.
+ * 
+ * @param onChunk - called with each new text chunk as it arrives
+ * @returns the final complete LLMResponse
+ */
+export async function sendChatStream(
+  messages: LLMMessage[],
+  systemPrompt: string | undefined,
+  onChunk: (chunk: string, accumulated: string) => void,
+  config?: LLMProviderConfig,
+): Promise<LLMResponse> {
+  const cfg = config || loadConfig();
+
+  const fullMessages: LLMMessage[] = systemPrompt
+    ? [{ role: 'system', content: systemPrompt }, ...messages]
+    : messages;
+
+  try {
+    switch (cfg.provider) {
+      case 'lmstudio':
+      case 'ollama':
+      case 'custom':
+        return await sendOpenAICompatibleStream(fullMessages, cfg, onChunk);
+      case 'gemini':
+      case 'claude':
+      default:
+        // Fallback: non-streaming, emit full text as single chunk
+        const result = cfg.provider === 'gemini'
+          ? await sendGemini(fullMessages, cfg)
+          : cfg.provider === 'claude'
+            ? await sendClaude(fullMessages, cfg)
+            : await sendOpenAICompatible(fullMessages, cfg);
+        if (result.text) onChunk(result.text, result.text);
+        return result;
+    }
+  } catch (error: any) {
+    console.error(`[LLM][${cfg.provider}] Stream error:`, error);
+    return {
+      text: '',
+      provider: cfg.provider,
+      error: error?.message || 'Unknown error connecting to LLM',
+    };
+  }
+}
+
 // ─── Provider: OpenAI-Compatible (LM Studio, Ollama, Custom) ─────────────────
+
+/**
+ * Resolve the model name to use. If config.model is empty, try to auto-detect
+ * from the server's /v1/models endpoint (picks the first loaded model).
+ */
+async function resolveModelName(config: LLMProviderConfig): Promise<string> {
+  if (config.model) return config.model;
+
+  const baseUrl = config.apiUrl.replace(/\/+$/, '');
+  const headers: Record<string, string> = {};
+  if (config.apiKey) headers['Authorization'] = `Bearer ${config.apiKey}`;
+
+  try {
+    const res = await fetch(`${baseUrl}/v1/models`, { headers });
+    if (res.ok) {
+      const data = await res.json();
+      const models = (data.data || []).map((m: any) => m.id).filter(Boolean);
+      if (models.length > 0) {
+        console.log(`[LLM] Auto-detected model: ${models[0]}`);
+        return models[0];
+      }
+    }
+  } catch { /* ignore */ }
+
+  console.warn('[LLM] No model specified and auto-detect failed. Using empty model name.');
+  return '';
+}
 
 async function sendOpenAICompatible(
   messages: LLMMessage[],
   config: LLMProviderConfig,
 ): Promise<LLMResponse> {
   const baseUrl = config.apiUrl.replace(/\/+$/, '');
-
-  // Ollama uses /api/chat natively but also supports /v1/chat/completions
-  // LM Studio and most others use /v1/chat/completions
   const endpoint = `${baseUrl}/v1/chat/completions`;
 
   const headers: Record<string, string> = {
@@ -229,8 +301,10 @@ async function sendOpenAICompatible(
     headers['Authorization'] = `Bearer ${config.apiKey}`;
   }
 
+  const modelName = await resolveModelName(config);
+
   const body = {
-    model: config.model || 'default',
+    model: modelName,
     messages: messages.map(m => ({ role: m.role, content: m.content })),
     temperature: 0.7,
     max_tokens: 8192,
@@ -248,14 +322,162 @@ async function sendOpenAICompatible(
   }
 
   const data = await response.json();
-  const text = data.choices?.[0]?.message?.content || '';
+  // Support both regular content and reasoning_content (Qwen3 thinking mode)
+  const msg = data.choices?.[0]?.message;
+  const text = msg?.content || msg?.reasoning_content || '';
   const tokensUsed = data.usage?.total_tokens;
 
   return {
     text,
-    model: data.model || config.model,
+    model: data.model || modelName,
     provider: config.provider,
     tokensUsed,
+  };
+}
+
+// ─── Provider: OpenAI-Compatible STREAMING ───────────────────────────────────
+
+async function sendOpenAICompatibleStream(
+  messages: LLMMessage[],
+  config: LLMProviderConfig,
+  onChunk: (chunk: string, accumulated: string) => void,
+): Promise<LLMResponse> {
+  const baseUrl = config.apiUrl.replace(/\/+$/, '');
+  const endpoint = `${baseUrl}/v1/chat/completions`;
+
+  const headers: Record<string, string> = {
+    'Content-Type': 'application/json',
+  };
+  if (config.apiKey) {
+    headers['Authorization'] = `Bearer ${config.apiKey}`;
+  }
+
+  const modelName = await resolveModelName(config);
+
+  const body = {
+    model: modelName,
+    messages: messages.map(m => ({ role: m.role, content: m.content })),
+    temperature: 0.7,
+    max_tokens: 8192,
+    stream: true,
+  };
+
+  console.log(`[LLM][stream] Sending to ${endpoint} (model: ${modelName}, messages: ${messages.length})`);
+
+  const response = await fetch(endpoint, {
+    method: 'POST',
+    headers,
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) {
+    const errorText = await response.text().catch(() => '');
+    throw new Error(`${config.provider} API error ${response.status}: ${errorText.slice(0, 200)}`);
+  }
+
+  // Parse SSE stream
+  const reader = response.body?.getReader();
+  if (!reader) {
+    // Fallback: try non-streaming if body isn't readable
+    console.warn('[LLM][stream] Response body not readable, falling back to non-streaming');
+    const result = await sendOpenAICompatible(messages, config);
+    if (result.text) onChunk(result.text, result.text);
+    return result;
+  }
+
+  const decoder = new TextDecoder();
+  let accumulated = '';
+  let reasoningAccumulated = ''; // Qwen3 thinking mode content
+  let resolvedModel = modelName;
+  let buffer = '';
+  let chunkCount = 0;
+
+  try {
+    while (true) {
+      const { done, value } = await reader.read();
+      if (done) break;
+
+      buffer += decoder.decode(value, { stream: true });
+      const lines = buffer.split('\n');
+      buffer = lines.pop() || ''; // Keep incomplete line in buffer
+
+      for (const line of lines) {
+        const trimmed = line.trim();
+        if (!trimmed || trimmed === 'data: [DONE]') continue;
+        if (!trimmed.startsWith('data: ')) continue;
+
+        try {
+          const json = JSON.parse(trimmed.slice(6));
+
+          // Detect SSE error objects (e.g. LM Studio context overflow)
+          if (json.error) {
+            const errMsg = typeof json.error === 'string'
+              ? json.error
+              : json.error.message || json.error.title || JSON.stringify(json.error);
+            console.error(`[LLM][stream] Server error in SSE: ${errMsg}`);
+            reader.releaseLock();
+            return {
+              text: '',
+              model: resolvedModel,
+              provider: config.provider,
+              error: errMsg,
+            };
+          }
+
+          const delta = json.choices?.[0]?.delta;
+          if (!delta) continue;
+          chunkCount++;
+
+          // Handle regular content
+          if (delta.content) {
+            accumulated += delta.content;
+            onChunk(delta.content, accumulated);
+          }
+          // Handle Qwen3 reasoning_content (thinking mode)
+          if (delta.reasoning_content) {
+            reasoningAccumulated += delta.reasoning_content;
+            // Wrap in <think> tags so cleanReply can strip it
+            const fullVisible = `<think>${reasoningAccumulated}</think>${accumulated}`;
+            onChunk('', fullVisible);
+          }
+          if (json.model) resolvedModel = json.model;
+        } catch {
+          // Skip malformed JSON chunks
+        }
+      }
+    }
+  } finally {
+    reader.releaseLock();
+  }
+
+  console.log(`[LLM][stream] Done. chunks=${chunkCount}, content=${accumulated.length}c, reasoning=${reasoningAccumulated.length}c`);
+
+  // If streaming produced only reasoning_content and no regular content,
+  // include reasoning wrapped in <think> so cleanReply can handle it
+  let finalText = accumulated;
+  if (!finalText && reasoningAccumulated) {
+    finalText = `<think>${reasoningAccumulated}</think>`;
+    console.warn('[LLM][stream] Only reasoning_content received (no regular content). Model may be in thinking-only mode.');
+  }
+
+  // If streaming produced nothing at all, try non-streaming as fallback
+  if (!finalText && chunkCount === 0) {
+    console.warn('[LLM][stream] No content from streaming (0 chunks). Retrying non-streaming...');
+    try {
+      const fallback = await sendOpenAICompatible(messages, config);
+      if (fallback.text) {
+        onChunk(fallback.text, fallback.text);
+        return fallback;
+      }
+    } catch (e) {
+      console.error('[LLM][stream] Non-streaming fallback also failed:', e);
+    }
+  }
+
+  return {
+    text: finalText,
+    model: resolvedModel,
+    provider: config.provider,
   };
 }
 

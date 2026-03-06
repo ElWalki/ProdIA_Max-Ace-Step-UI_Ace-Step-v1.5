@@ -96,6 +96,14 @@ function AppContent() {
   const [pendingLyrics, setPendingLyrics] = useState<{ text: string; mode: 'overwrite' | 'append' } | null>(null);
   // Chat: last completed generated song for inline playback
   const [lastGeneratedSong, setLastGeneratedSong] = useState<Song | null>(null);
+  // Generated audio codes for Códigos tab
+  const [generatedCodes, setGeneratedCodes] = useState<Array<{
+    songId: string;
+    title: string;
+    codes: string;
+    codeCount: number;
+    extractedAt: Date;
+  }>>([]);
   // Sidebar info panel
   const [sidebarInfoText, setSidebarInfoText] = useState<{ title: string; content: string } | null>(null);
 
@@ -774,11 +782,33 @@ function AppContent() {
 
           // Capture the completed song for chat inline playback
           // After refresh, the newest non-generating song is the result
+          let completedSongRef: Song | null = null;
           setSongs(prev => {
             const completedSong = prev.find(s => !s.isGenerating && s.audioUrl);
-            if (completedSong) setLastGeneratedSong(completedSong);
+            if (completedSong) {
+              setLastGeneratedSong(completedSong);
+              completedSongRef = completedSong;
+            }
             return prev;
           });
+
+          // Auto-extract audio codes in the background (outside setSongs to avoid stale refs)
+          if (completedSongRef && (completedSongRef as Song).audioUrl && token) {
+            const song = completedSongRef as Song;
+            generateApi.extractAudioCodes(song.audioUrl!, token)
+              .then(codesResult => {
+                if (codesResult?.audioCodes) {
+                  setGeneratedCodes(prev => [{
+                    songId: song.id,
+                    title: song.title || 'Untitled',
+                    codes: codesResult.audioCodes,
+                    codeCount: codesResult.codeCount || codesResult.audioCodes.split(/\s+/).length,
+                    extractedAt: new Date(),
+                  }, ...prev].slice(0, 50));
+                }
+              })
+              .catch(() => { /* silent — codes are optional */ });
+          }
 
           if (window.innerWidth < 768) {
             setMobileShowList(true);
@@ -1924,6 +1954,7 @@ function AppContent() {
         onSetLyrics={handleChatSetLyrics}
         isGenerating={isGenerating}
         lastGeneratedSong={lastGeneratedSong}
+        generatedCodes={generatedCodes}
         currentSong={currentSong}
         isPlaying={isPlaying}
         currentTime={currentTime}

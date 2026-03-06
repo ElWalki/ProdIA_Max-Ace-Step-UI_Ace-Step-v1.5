@@ -446,6 +446,10 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const [instrumentalAudioUrl, setInstrumentalAudioUrl] = useState('');
   const [isSeparating, setIsSeparating] = useState(false);
   const [separationQuality, setSeparationQuality] = useState<'rapida' | 'alta' | 'maxima'>('alta');
+  const [separationBackend, setSeparationBackend] = useState<'demucs' | 'uvr'>('demucs');
+  const [separationModel, setSeparationModel] = useState('UVR-MDX-NET-Inst_HQ_3');
+  const [separationStems, setSeparationStems] = useState<2 | 4>(2);
+  const [extraStems, setExtraStems] = useState<Record<string, { url: string; filename: string }>>({});
   const [useVocalAsReference, setUseVocalAsReference] = useState(true);
   const [useInstrumentalAsSource, setUseInstrumentalAsSource] = useState(false);
   
@@ -779,6 +783,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
         if (p.sourceAudioTitle !== undefined) setSourceAudioTitle(p.sourceAudioTitle);
         if (p.audioCoverStrength !== undefined) setAudioCoverStrength(Number(p.audioCoverStrength));
         if (p.sourceStrength !== undefined) setSourceStrength(Number(p.sourceStrength));
+        if (p.audioCodes !== undefined) setAudioCodes(p.audioCodes);
         // Repaint / edit
         if (p.repaintingStart !== undefined) setRepaintingStart(Number(p.repaintingStart));
         if (p.repaintingEnd !== undefined) setRepaintingEnd(Number(p.repaintingEnd));
@@ -2221,23 +2226,43 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
   const handleSeparateStems = async (audioUrl: string, title: string) => {
     if (isSeparating) return;
     setIsSeparating(true);
+    setExtraStems({});
     try {
-      const result = await trainingApi.separateStems(audioUrl, separationQuality, token || undefined);
+      const result = await trainingApi.separateStems(audioUrl, separationQuality, token || undefined, {
+        backend: separationBackend,
+        model: separationBackend === 'uvr' ? separationModel : undefined,
+        stems: separationStems,
+      });
       if (result.success) {
         // Set vocal audio
-        setVocalAudioUrl(result.vocals.url);
-        setVocalAudioTitle(`${title} (Vocal)`);
+        if (result.vocals) {
+          setVocalAudioUrl(result.vocals.url);
+          setVocalAudioTitle(`${title} (Vocal)`);
+        }
         // Store instrumental URL
-        setInstrumentalAudioUrl(result.instrumental.url);
+        if (result.instrumental) {
+          setInstrumentalAudioUrl(result.instrumental.url);
+        }
+
+        // Store extra stems (drums, bass, other) if present
+        const extras: Record<string, { url: string; filename: string }> = {};
+        if (result.allStems) {
+          for (const [stemName, stemData] of Object.entries(result.allStems)) {
+            if (stemName !== 'vocals' && stemName !== 'instrumental') {
+              extras[stemName] = { url: stemData.url, filename: stemData.filename };
+            }
+          }
+        }
+        setExtraStems(extras);
 
         // Auto-apply based on user preferences
-        if (useVocalAsReference) {
+        if (useVocalAsReference && result.vocals) {
           setReferenceAudioUrl(result.vocals.url);
           setReferenceAudioTitle(`${title} (Vocal)`);
           setReferenceTime(0);
           setReferenceDuration(0);
         }
-        if (useInstrumentalAsSource) {
+        if (useInstrumentalAsSource && result.instrumental) {
           setSourceAudioUrl(result.instrumental.url);
           setSourceAudioTitle(`${title} (Instrumental)`);
           setSourceTime(0);
@@ -2464,6 +2489,7 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
       useAdg,
       cfgIntervalStart,
       cfgIntervalEnd,
+      audioCodes: audioCodes.trim() || undefined,
       customTimesteps: customTimesteps.trim() || undefined,
       useCotMetas,
       useCotCaption,
@@ -3821,29 +3847,92 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                       <div className="flex items-center gap-2 p-2.5 rounded-lg bg-violet-50 dark:bg-violet-900/20 border border-violet-200 dark:border-violet-800/30">
                         <Loader2 size={14} className="animate-spin text-violet-500" />
                         <span className="text-[11px] text-violet-700 dark:text-violet-300 font-medium">
-                          Separating audio with Demucs... This may take a few minutes.
+                          Separating audio with {separationBackend === 'uvr' ? 'UVR (MDX-Net)' : 'Demucs'}... This may take a few minutes.
                         </span>
                       </div>
                     )}
 
-                    {/* Quality selector + Auto-apply options */}
+                    {/* Separator options */}
                     {!isSeparating && (
                       <div className="space-y-2">
+                        {/* Backend selector */}
                         <div className="flex items-center gap-2">
-                          <label className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Quality</label>
+                          <label className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Engine</label>
                           <div className="flex items-center gap-1 bg-zinc-200/50 dark:bg-black/30 rounded-md p-0.5">
-                            {(['rapida', 'alta', 'maxima'] as const).map((q) => (
+                            {(['demucs', 'uvr'] as const).map((b) => (
                               <button
-                                key={q}
+                                key={b}
                                 type="button"
-                                onClick={() => setSeparationQuality(q)}
-                                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
-                                  separationQuality === q
+                                onClick={() => setSeparationBackend(b)}
+                                className={`px-2.5 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                                  separationBackend === b
                                     ? 'bg-white dark:bg-zinc-700 text-violet-600 dark:text-violet-400 shadow-sm'
                                     : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700'
                                 }`}
                               >
-                                {q === 'rapida' ? 'Fast' : q === 'alta' ? 'High' : 'Max'}
+                                {b === 'demucs' ? 'Demucs' : 'UVR / MDX-Net'}
+                              </button>
+                            ))}
+                          </div>
+                        </div>
+
+                        {/* Quality selector (Demucs only) */}
+                        {separationBackend === 'demucs' && (
+                          <div className="flex items-center gap-2">
+                            <label className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Quality</label>
+                            <div className="flex items-center gap-1 bg-zinc-200/50 dark:bg-black/30 rounded-md p-0.5">
+                              {(['rapida', 'alta', 'maxima'] as const).map((q) => (
+                                <button
+                                  key={q}
+                                  type="button"
+                                  onClick={() => setSeparationQuality(q)}
+                                  className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                                    separationQuality === q
+                                      ? 'bg-white dark:bg-zinc-700 text-violet-600 dark:text-violet-400 shadow-sm'
+                                      : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700'
+                                  }`}
+                                >
+                                  {q === 'rapida' ? 'Fast' : q === 'alta' ? 'High' : 'Max'}
+                                </button>
+                              ))}
+                            </div>
+                          </div>
+                        )}
+
+                        {/* UVR Model selector */}
+                        {separationBackend === 'uvr' && (
+                          <div className="flex items-center gap-2">
+                            <label className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Model</label>
+                            <select
+                              value={separationModel}
+                              onChange={(e) => setSeparationModel(e.target.value)}
+                              className="flex-1 text-[10px] bg-zinc-100 dark:bg-zinc-800 border border-zinc-200 dark:border-zinc-700 rounded-md px-2 py-1 text-zinc-700 dark:text-zinc-300 focus:outline-none focus:ring-1 focus:ring-violet-500"
+                            >
+                              <option value="UVR-MDX-NET-Inst_HQ_3">MDX-Net Inst HQ 3 (best overall)</option>
+                              <option value="UVR-MDX-NET-Voc_FT">MDX-Net Vocal FT (vocal-focused)</option>
+                              <option value="UVR_MDXNET_KARA_2">MDX-Net Karaoke 2</option>
+                              <option value="Kim_Vocal_2">Kim Vocal 2 (popular)</option>
+                              <option value="UVR-MDX-NET-Inst_3">MDX-Net Inst 3 (clean inst)</option>
+                            </select>
+                          </div>
+                        )}
+
+                        {/* Stem count selector */}
+                        <div className="flex items-center gap-2">
+                          <label className="text-[10px] font-medium text-zinc-500 dark:text-zinc-400 uppercase tracking-wide">Stems</label>
+                          <div className="flex items-center gap-1 bg-zinc-200/50 dark:bg-black/30 rounded-md p-0.5">
+                            {([2, 4] as const).map((s) => (
+                              <button
+                                key={s}
+                                type="button"
+                                onClick={() => setSeparationStems(s)}
+                                className={`px-2 py-0.5 rounded text-[10px] font-medium transition-colors ${
+                                  separationStems === s
+                                    ? 'bg-white dark:bg-zinc-700 text-violet-600 dark:text-violet-400 shadow-sm'
+                                    : 'text-zinc-500 dark:text-zinc-400 hover:text-zinc-700'
+                                }`}
+                              >
+                                {s === 2 ? '2 (Vocal + Inst)' : '4 (Vocal + Drums + Bass + Other)'}
                               </button>
                             ))}
                           </div>
@@ -3889,6 +3978,31 @@ export const CreatePanel: React.FC<CreatePanelProps> = ({
                             >
                               Use as Source
                             </button>
+                          </div>
+                        )}
+
+                        {/* Extra stems indicators (drums, bass, other) */}
+                        {Object.keys(extraStems).length > 0 && (
+                          <div className="space-y-1">
+                            {Object.entries(extraStems).map(([stemName, stemData]) => (
+                              <div key={stemName} className="flex items-center gap-2 p-1.5 rounded-lg bg-amber-50 dark:bg-amber-900/10 border border-amber-200 dark:border-amber-800/20">
+                                <span className="w-1.5 h-1.5 rounded-full bg-amber-500" />
+                                <span className="text-[10px] text-amber-700 dark:text-amber-400 capitalize">{stemName}</span>
+                                <span className="text-[9px] text-zinc-400 truncate flex-1">{stemData.filename}</span>
+                                <button
+                                  type="button"
+                                  onClick={() => {
+                                    setSourceAudioUrl(stemData.url);
+                                    setSourceAudioTitle(`${vocalAudioTitle?.replace(' (Vocal)', '')} (${stemName})`);
+                                    setSourceTime(0);
+                                    setSourceDuration(0);
+                                  }}
+                                  className="text-[10px] font-medium text-amber-600 dark:text-amber-400 hover:underline whitespace-nowrap"
+                                >
+                                  Use as Source
+                                </button>
+                              </div>
+                            ))}
                           </div>
                         )}
                       </div>

@@ -1,0 +1,235 @@
+@import "tailwindcss";
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme {
+  /* ── Dark-first surface palette ── */
+  --color-surface-0:   #0a0a0c;
+  --color-surface-50:  #0f0f12;
+  --color-surface-100: #151518;
+  --color-surface-150: #1a1a1f;
+  --color-surface-200: #1f1f25;
+  --color-surface-250: #26262d;
+  --color-surface-300: #2c2c35;
+  --color-surface-400: #3d3d48;
+  --color-surface-500: #5a5a66;
+  --color-surface-600: #8888995e;
+  --color-surface-700: #aaaabb;
+  --color-surface-800: #ccccdd;
+  --color-surface-900: #e8e8f0;
+  --color-surface-950: #f5f5fa;
+
+  /* ── Accent: electric violet/indigo ── */
+  --color-accent-50:  #eef2ff;
+  --color-accent-100: #e0e7ff;
+  --color-accent-200: #c7d2fe;
+  --color-accent-300: #a5b4fc;
+  --color-accent-400: #818cf8;
+  --color-accent-500: #6366f1;
+  --color-accent-600: #4f46e5;
+  --color-accent-700: #4338ca;
+  --color-accent-800: #3730a3;
+  --color-accent-900: #312e81;
+
+  /* ── Brand: warm gradient endpoint ── */
+  --color-brand-400: #c084fc;
+  --color-brand-500: #a855f7;
+  --color-brand-600: #9333ea;
+
+  /* ── Glow / special ── */
+  --color-glow: #6366f180;
+}
+
+/* ── Base defaults ── */
+html {
+  background-color: var(--color-surface-0);
+  color: var(--color-surface-900);
+  font-family: 'Inter', system-ui, -apple-system, sans-serif;
+}
+body { overflow: hidden; }
+
+/* ── Scrollbar ── */
+::-webkit-scrollbar { width: 5px; height: 5px; }
+::-webkit-scrollbar-track { background: transparent; }
+::-webkit-scrollbar-thumb { background: var(--color-surface-300); border-radius: 999px; }
+::-webkit-scrollbar-thumb:hover { background: var(--color-surface-400); }
+
+/* ── Textarea: vertical resize only, bottom-edge handle ── */
+textarea {
+  cursor: text;
+  resize: vertical;
+}
+textarea::-webkit-resizer {
+  display: none;
+}
+
+/* ── Custom resize handle (bottom bar) ── */
+.textarea-resize-handle {
+  position: absolute;
+  bottom: 0;
+  left: 50%;
+  transform: translateX(-50%);
+  width: 40px;
+  height: 6px;
+  cursor: ns-resize;
+  z-index: 5;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.textarea-resize-handle::after {
+  content: '';
+  width: 28px;
+  height: 3px;
+  border-radius: 2px;
+  background: var(--color-surface-400);
+  transition: background 0.15s;
+}
+.textarea-resize-handle:hover::after {
+  background: var(--color-accent-500);
+}
+
+/* ── Panel divider (horizontal resize) ── */
+.panel-divider {
+  width: 5px;
+  cursor: col-resize;
+  background: transparent;
+  transition: background 0.15s;
+  position: relative;
+  flex-shrink: 0;
+}
+.panel-divider:hover,
+.panel-divider.active {
+  background: var(--color-accent-500);
+}
+.panel-divider::after {
+  content: '';
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  width: 3px;
+  height: 32px;
+  border-radius: 2px;
+  background: var(--color-surface-400);
+  transition: background 0.15s;
+}
+.panel-divider:hover::after,
+.panel-divider.active::after {
+  background: var(--color-accent-300);
+}
+
+/* ── Hide scrollbars in panels ── */
+.no-scrollbar {
+  scrollbar-width: none;
+  -ms-overflow-style: none;
+}
+.no-scrollbar::-webkit-scrollbar {
+  display: none;
+}
+
+/* ── Hide number input spinners ── */
+input[type="number"]::-webkit-inner-spin-button,
+input[type="number"]::-webkit-outer-spin-button {
+  -webkit-appearance: none;
+  margin: 0;
+}
+input[type="number"] { -moz-appearance: textfield; }
+
+/* ── Focus ring ── */
+input:focus, textarea:focus, select:focus {
+  outline: none;
+  box-shadow: 0 0 0 1.5px var(--color-accent-500);
+}
+button:focus-visible {
+  outline: 2px solid var(--color-accent-500);
+  outline-offset: 2px;
+}
+
+/* ── Inputs baseline ── */
+input, textarea, select {
+  background-color: var(--color-surface-100);
+  border: 1px solid var(--color-surface-300);
+  color: var(--color-surface-900);
+  border-radius: 8px;
+  transition: border-color 0.15s, box-shadow 0.15s;
+}
+input::placeholder, textarea::placeholder { color: var(--color-surface-500); }
+input:hover, textarea:hover, select:hover {
+  border-color: var(--color-surface-400);
+}
+
+/* ── Range slider ── */
+input[type="range"] {
+  -webkit-appearance: none;
+  appearance: none;
+  background: transparent;
+  cursor: pointer;
+  height: 20px;
+}
+input[type="range"]::-webkit-slider-runnable-track {
+  height: 4px;
+  border-radius: 2px;
+  background: var(--color-surface-300);
+}
+input[type="range"]::-webkit-slider-thumb {
+  -webkit-appearance: none;
+  width: 14px;
+  height: 14px;
+  border-radius: 50%;
+  background: var(--color-accent-500);
+  margin-top: -5px;
+  box-shadow: 0 0 6px var(--color-glow);
+  transition: transform 0.1s;
+}
+input[type="range"]::-webkit-slider-thumb:hover {
+  transform: scale(1.2);
+}
+
+/* ── Animations ── */
+@keyframes pulse-slow {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.5; }
+}
+.animate-pulse-slow { animation: pulse-slow 1.8s ease-in-out infinite; }
+
+@keyframes slide-up {
+  from { transform: translateY(10px); opacity: 0; }
+  to { transform: translateY(0); opacity: 1; }
+}
+.animate-slide-up { animation: slide-up 0.25s cubic-bezier(0.16, 1, 0.3, 1); }
+
+@keyframes fade-in {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+.animate-fade-in { animation: fade-in 0.15s ease-out; }
+
+@keyframes scale-in {
+  from { transform: scale(0.95); opacity: 0; }
+  to { transform: scale(1); opacity: 1; }
+}
+.animate-scale-in { animation: scale-in 0.15s cubic-bezier(0.16, 1, 0.3, 1); }
+
+/* ── Glass effect ── */
+.glass {
+  background: rgba(15, 15, 18, 0.85);
+  backdrop-filter: blur(8px) saturate(120%);
+  -webkit-backdrop-filter: blur(8px) saturate(120%);
+}
+
+/* ── Glow button ── */
+.btn-glow {
+  position: relative;
+  overflow: hidden;
+}
+.btn-glow::after {
+  content: '';
+  position: absolute;
+  inset: 0;
+  border-radius: inherit;
+  opacity: 0;
+  transition: opacity 0.3s;
+  box-shadow: 0 0 20px var(--color-glow), inset 0 0 20px var(--color-glow);
+}
+.btn-glow:hover::after { opacity: 0.4; }

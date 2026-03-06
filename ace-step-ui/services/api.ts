@@ -354,12 +354,6 @@ export const generateApi = {
   reinitialize: (token: string): Promise<{ cancelledJobs: number; message: string }> =>
     api('/api/generate/reinitialize', { method: 'POST', token }),
 
-  vramDiagnostic: (token: string): Promise<any> =>
-    api('/api/generate/vram/diagnostic', { token }),
-
-  vramForceCleanup: (token: string): Promise<any> =>
-    api('/api/generate/vram/force-cleanup', { method: 'POST', token }),
-
   // Backend status — DiT + LLM model info
   getBackendStatus: (): Promise<{
     dit: { loaded: boolean; model: string | null; is_turbo: boolean };
@@ -997,14 +991,107 @@ export const trainingApi = {
     hint?: string;
   }> => api('/api/training/auto-label-single', { method: 'POST', body: { audioPath, transcribeLyrics }, token }),
 
-  separateStems: (audioPath: string, quality: 'rapida' | 'alta' | 'maxima' = 'alta', token?: string): Promise<{
+  separateStems: (audioPath: string, quality: 'rapida' | 'alta' | 'maxima' = 'alta', token?: string, options?: {
+    backend?: 'demucs' | 'uvr';
+    model?: string;
+    stems?: 2 | 4;
+  }): Promise<{
     success: boolean;
-    vocals: { url: string; path: string; filename: string };
-    instrumental: { url: string; path: string; filename: string };
+    backend: string;
+    stemCount: number;
+    vocals?: { url: string; path: string; filename: string };
+    instrumental?: { url: string; path: string; filename: string };
+    allStems: Record<string, { url: string; path: string; filename: string }>;
     duration: number;
     elapsed: number;
     error?: string;
-  }> => api('/api/training/separate-stems', { method: 'POST', body: { audioPath, quality }, token }),
+  }> => api('/api/training/separate-stems', {
+    method: 'POST',
+    body: {
+      audioPath,
+      quality,
+      backend: options?.backend || 'demucs',
+      model: options?.model,
+      stems: options?.stems || 2,
+    },
+    token,
+  }),
+
+  separatorModels: (token?: string): Promise<{
+    models: Array<{ name: string; description: string; stems: number }>;
+  }> => api('/api/training/separator-models', { token }),
+
+  // Detect BPM and musical key from an audio file
+  detectBpmKey: (audioPath: string, token?: string, options?: {
+    normalizeBpm?: boolean;
+  }): Promise<{
+    success: boolean;
+    bpm: number;
+    bpm_exact: number;
+    key: string;
+    mode: string;
+    key_scale: string;
+    confidence: number;
+    duration_sec: number;
+    elapsed_seconds: number;
+    error?: string;
+  }> => api('/api/training/detect-bpm-key', {
+    method: 'POST',
+    body: {
+      audioPath,
+      normalizeBpm: options?.normalizeBpm !== false,
+    },
+    token,
+  }),
+
+  // Batch BPM/key detection for multiple audio files
+  detectBpmKeyBatch: (audioPaths: string[], token?: string): Promise<{
+    success: boolean;
+    results: Array<{
+      success: boolean;
+      file: string;
+      bpm?: number;
+      key?: string;
+      mode?: string;
+      key_scale?: string;
+      confidence?: number;
+      error?: string;
+    }>;
+    total: number;
+    elapsed_seconds: number;
+  }> => api('/api/training/detect-bpm-key-batch', {
+    method: 'POST',
+    body: { audioPaths },
+    token,
+  }),
+
+  // Enhanced Whisper transcription with anti-hallucination + structure detection
+  transcribeEnhanced: (audioPath: string, token?: string, options?: {
+    model?: string;
+    language?: string;
+    structure?: boolean;
+    backend?: 'auto' | 'openai' | 'faster';
+  }): Promise<{
+    transcript: string;
+    structured_transcript: string | null;
+    language: string;
+    segments: number;
+    filtered: number;
+    backend: string;
+    model: string;
+    elapsed: number;
+    error?: string;
+  }> => api('/api/training/transcribe-enhanced', {
+    method: 'POST',
+    body: {
+      audioPath,
+      model: options?.model || 'base',
+      language: options?.language,
+      structure: options?.structure || false,
+      backend: options?.backend || 'auto',
+    },
+    token,
+  }),
 };
 
 // Voice presets API

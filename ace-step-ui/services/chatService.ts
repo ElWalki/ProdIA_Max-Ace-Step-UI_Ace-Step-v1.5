@@ -1,7 +1,87 @@
-import { sendChat, loadConfig, isConfigured, LLMMessage, saveChatHistory, loadChatHistory, StoredChatSession } from './llmProviderService';
+import { sendChat, sendChatStream, loadConfig, isConfigured, LLMMessage, saveChatHistory, loadChatHistory, StoredChatSession } from './llmProviderService';
 import { uiBridge, UIState, formatUIStateForLLM, parseUIActions, UIAction } from './uiBridge';
 // Import the knowledge base as raw text (bundled at build time)
 import assistantKnowledge from '../data/assistant-knowledge.md?raw';
+
+// ---------------------------------------------------------------------------
+// Token estimation & smart prompt truncation
+// ---------------------------------------------------------------------------
+
+/** Rough token estimate: ~3.5 chars per token for mixed Spanish/English + markdown */
+function estimateTokens(text: string): number {
+  return Math.ceil(text.length / 3.5);
+}
+
+/**
+ * Default max context budget (tokens). Leaves room for the user message + response.
+ * Most local models run 4096–8192 context. We budget the system prompt to leave
+ * at least ~1500 tokens for conversation + response.
+ */
+const SYSTEM_PROMPT_BUDGET = 2500;
+
+/**
+ * Build the system prompt, intelligently truncating if the total would exceed
+ * the context budget. Priority order (last to be cut first):
+ *   1. UI state snapshot (least critical — the assistant can ask)
+ *   2. Knowledge base (can be summarized / trimmed)
+ *   3. Song contexts (important when present)
+ *   4. Base prompt + mode addendum (never cut)
+ */
+function buildSystemPrompt(
+  mode: 'agent' | 'instructor',
+  lang: string,
+  songContexts: SongContext[],
+): string {
+  const modeAddendum = mode === 'agent' ? AGENT_MODE_ADDENDUM : INSTRUCTOR_MODE_ADDENDUM;
+  const corePart = SYSTEM_PROMPT_BASE + modeAddendum;
+  const langTag = `\n\n[LANG=${lang}] [MODE=${mode}]`;
+  const coreTokens = estimateTokens(corePart + langTag);
+
+  let budget = SYSTEM_PROMPT_BUDGET - coreTokens;
+
+  // Prepare optional sections
+  const knowledgeSection = `\n\n═══ BASE DE CONOCIMIENTO ═══\n${assistantKnowledge}`;
+  const songSection = songContexts.length > 0 ? formatSongContextForLLM(songContexts) : '';
+  const uiState = uiBridge.getState();
+  const uiSection = uiState ? '\n\n' + formatUIStateForLLM(uiState) : '';
+
+  let knowledgeText = knowledgeSection;
+  let songText = songSection;
+  let uiText = uiSection;
+
+  const totalTokens = estimateTokens(knowledgeText + songText + uiText);
+
+  if (totalTokens > budget) {
+    console.warn(`[Chat] System prompt too large (~${coreTokens + totalTokens} tokens). Trimming to fit budget of ${SYSTEM_PROMPT_BUDGET}...`);
+
+    // Step 1: Drop UI state (regenerable — assistant can check via uiBridge)
+    if (estimateTokens(knowledgeText + songText) > budget) {
+      uiText = '\n\n(Estado UI omitido por límite de contexto / UI state omitted due to context limit)';
+    }
+
+    // Step 2: Trim knowledge base — keep only the essential sections
+    const remainingBudget = budget - estimateTokens(songText + uiText);
+    if (estimateTokens(knowledgeText) > remainingBudget && remainingBudget > 200) {
+      // Keep only: parameters table + actions + troubleshooting (skip chord progressions, advanced params)
+      const maxChars = Math.floor(remainingBudget * 3.5);
+      knowledgeText = `\n\n═══ BASE DE CONOCIMIENTO (resumida) ═══\n${assistantKnowledge.substring(0, maxChars)}\n[... truncado por límite de contexto]`;
+    } else if (remainingBudget <= 200) {
+      knowledgeText = '\n\n(Base de conocimiento omitida por límite de contexto / Knowledge base omitted)';
+    }
+
+    // Step 3: Trim song contexts if still over budget
+    const finalBudget = budget - estimateTokens(knowledgeText + uiText);
+    if (estimateTokens(songText) > finalBudget && finalBudget > 100) {
+      const maxChars = Math.floor(finalBudget * 3.5);
+      songText = songText.substring(0, maxChars) + '\n[... canciones truncadas por límite de contexto]';
+    }
+
+    const finalTotal = estimateTokens(corePart + langTag + knowledgeText + songText + uiText);
+    console.log(`[Chat] After trimming: ~${finalTotal} tokens (budget: ${SYSTEM_PROMPT_BUDGET})`);
+  }
+
+  return corePart + knowledgeText + songText + langTag + uiText;
+}
 
 export interface ParsedMusicRequest {
   title?: string;
@@ -48,6 +128,21 @@ export interface ChatMessage {
   actions?: UIAction[];  // Actions parsed from LLM response
 }
 
+// Song context passed to the LLM for analysis/remix
+export interface SongContext {
+  title: string;
+  style?: string;
+  lyrics?: string;
+  bpm?: number;
+  keyScale?: string;
+  timeSignature?: string;
+  duration?: string;
+  instrumental?: boolean;
+  vocalLanguage?: string;
+  model?: string;
+  tags?: string[];
+}
+
 // ---------------------------------------------------------------------------
 // SYSTEM PROMPT — ACE-Step 1.5 Expert
 // ---------------------------------------------------------------------------
@@ -89,7 +184,48 @@ Segundo verso
 [Chorus]
 Coro aquí
 
-NUNCA todo junto en una línea.`;
+NUNCA todo junto en una línea.
+
+═══ ANÁLISIS Y REMIX DE CANCIONES ═══
+Cuando el usuario carga canciones en el contexto (aparecen como [SONG_CONTEXT]), ANALÍZALAS en profundidad:
+
+1. **Análisis individual** — Para CADA canción cargada:
+   • Identifica estilo/género, BPM, tonalidad, estructura, idioma
+   • Analiza la letra: temática, emociones, figuras retóricas
+   • Evalúa los tags de estilo y su impacto en el sonido
+   • Nota aspectos técnicos (modelo, steps, guidance)
+
+2. **Análisis comparativo** — Cuando hay 2+ canciones:
+   • Compara BPMs, tonalidades, estilos
+   • Identifica elementos compatibles para fusión
+   • Señala conflictos potenciales (BPMs muy distintos, tonalidades incompatibles)
+
+3. **Propuestas de remix/fusión** — Cuando pidan remix, fusión o mashup:
+   • Sugiere un BPM intermedio o el más adecuado
+   • Propón una tonalidad que funcione con ambas
+   • Fusiona los mejores elementos de cada estilo en tags nuevos
+   • Combina fragmentos de letras o crea letra nueva inspirada en ambas
+   • Explica POR QUÉ cada decisión funciona musicalmente
+
+═══ FLUJO PASO A PASO ═══
+Para cambios complejos (remix, fusión, múltiples ajustes), usa el flujo PASO A PASO:
+
+• Presenta los cambios como PASOS NUMERADOS (Paso 1, Paso 2, Paso 3...)
+• Cada paso tiene UN SOLO bloque <ui_actions> con los cambios de ESE paso
+• Después de cada paso, PAUSA y pide confirmación: "¿Procedemos al siguiente paso?"
+• El usuario puede aceptar, modificar o saltar cada paso
+• Ejemplo de flujo:
+
+**Paso 1 — Configurar BPM y tonalidad base**
+Ajusto el BPM a 110 (medio entre tus dos canciones) y tonalidad a G minor.
+<ui_actions>
+[{"bpm": 110, "keyScale": "G minor"}]
+</ui_actions>
+¿Aplicamos este paso? Dime "ok" o "siguiente" para continuar.
+
+• NO pongas todos los pasos juntos. UN paso por mensaje.
+• Si el usuario dice "hazlo todo" → entonces sí aplica todos los cambios en un solo bloque.
+• El flujo termina con el paso final: {"action": "generate"}.`;
 
 // Agent mode addendum — AI applies actions autonomously
 const AGENT_MODE_ADDENDUM = `
@@ -107,35 +243,79 @@ Estás en MODO INSTRUCTOR. NO incluyas <ui_actions>. Solo EXPLICA qué haría el
 // Public API
 // ---------------------------------------------------------------------------
 
+// ---------------------------------------------------------------------------
+// Build context from loaded songs
+// ---------------------------------------------------------------------------
+function formatSongContextForLLM(songs: SongContext[]): string {
+  if (songs.length === 0) return '';
+  const lines: string[] = ['\n═══ [SONG_CONTEXT] — CANCIONES CARGADAS ═══'];
+  lines.push(`Total: ${songs.length} canción(es) en contexto.\n`);
+  for (let i = 0; i < songs.length; i++) {
+    const s = songs[i];
+    lines.push(`── Canción ${i + 1}: "${s.title || 'Sin título'}" ──`);
+    if (s.style) lines.push(`  Estilo/Tags: ${s.style}`);
+    if (s.bpm) lines.push(`  BPM: ${s.bpm}`);
+    if (s.keyScale) lines.push(`  Tonalidad: ${s.keyScale}`);
+    if (s.timeSignature) lines.push(`  Compás: ${s.timeSignature}`);
+    if (s.duration) lines.push(`  Duración: ${s.duration}`);
+    if (s.vocalLanguage) lines.push(`  Idioma vocal: ${s.vocalLanguage}`);
+    if (s.instrumental) lines.push(`  Instrumental: Sí`);
+    if (s.model) lines.push(`  Modelo: ${s.model}`);
+    if (s.tags && s.tags.length) lines.push(`  Tags: ${s.tags.join(', ')}`);
+    if (s.lyrics) {
+      const lyr = s.lyrics.length > 800 ? s.lyrics.substring(0, 800) + '\n[... letra truncada]' : s.lyrics;
+      lines.push(`  Letra:\n${lyr.split('\n').map(l => '    ' + l).join('\n')}`);
+    } else {
+      lines.push(`  Letra: (sin letra / instrumental)`);
+    }
+    lines.push('');
+  }
+  if (songs.length >= 2) {
+    lines.push('⚡ IMPORTANTE: Hay múltiples canciones cargadas. El usuario puede querer un remix, fusión o comparación. Analiza las diferencias y similitudes entre ellas.');
+  }
+  return lines.join('\n');
+}
+
 export async function chatWithAssistant(
   messages: ChatMessage[],
   lang: string = 'es',
   mode: 'agent' | 'instructor' = 'agent',
+  songContexts: SongContext[] = [],
 ): Promise<{ reply: string; params?: ParsedMusicRequest; actions?: UIAction[] }> {
   if (!isConfigured()) {
     return mockChatResponse(messages);
   }
 
   try {
-    // Build system prompt: base + mode addendum + knowledge base + UI state + language
-    let systemPrompt = SYSTEM_PROMPT_BASE;
-    systemPrompt += mode === 'agent' ? AGENT_MODE_ADDENDUM : INSTRUCTOR_MODE_ADDENDUM;
-    systemPrompt += `\n\n═══ BASE DE CONOCIMIENTO ═══\n${assistantKnowledge}`;
-    systemPrompt += `\n\n[LANG=${lang}] [MODE=${mode}]`;
-    const uiState = uiBridge.getState();
-    if (uiState) {
-      systemPrompt += '\n\n' + formatUIStateForLLM(uiState);
-    }
+    // Build system prompt with smart truncation for small context windows
+    const systemPrompt = buildSystemPrompt(mode, lang, songContexts);
 
-    // Convert ChatMessages to LLMMessages
-    const llmMessages: LLMMessage[] = messages
+    // Convert ChatMessages to LLMMessages (keep last N to avoid context overflow)
+    const allLLMMessages: LLMMessage[] = messages
       .filter(m => m.role === 'user' || m.role === 'assistant')
       .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+    // Trim conversation history if it would blow the context
+    const systemTokens = estimateTokens(systemPrompt);
+    const maxConvoTokens = Math.max(500, SYSTEM_PROMPT_BUDGET * 2 - systemTokens);
+    let llmMessages = allLLMMessages;
+    let convoTokens = estimateTokens(llmMessages.map(m => m.content).join(''));
+    while (convoTokens > maxConvoTokens && llmMessages.length > 2) {
+      // Remove oldest pair (keep at least last user message)
+      llmMessages = llmMessages.slice(2);
+      convoTokens = estimateTokens(llmMessages.map(m => m.content).join(''));
+    }
 
     const response = await sendChat(llmMessages, systemPrompt);
 
     if (response.error) {
       const config = loadConfig();
+      // Detect context overflow errors
+      if (response.error.includes('context') && (response.error.includes('exceed') || response.error.includes('n_keep'))) {
+        return {
+          reply: `⚠️ **Error: contexto del modelo demasiado pequeño**\n\nEl prompt del sistema (~${systemTokens} tokens) excede el contexto del modelo.\n\n**Solución:** En LM Studio → Model Settings → aumenta **Context Length** a **8192** o más (16384 recomendado).\n\nAlternativamente, usa un modelo con mayor contexto.`,
+        };
+      }
       return {
         reply: `⚠️ Error from ${config.provider}: ${response.error}\n\nCheck your connection in Settings → AI Assistant.`,
       };
@@ -161,6 +341,106 @@ export async function chatWithAssistant(
     console.error("Chat error:", error);
     return {
       reply: `⚠️ Error connecting to AI: ${error?.message || 'Unknown error'}. Check Settings → AI Assistant.`,
+    };
+  }
+}
+
+// ---------------------------------------------------------------------------
+// Streaming Chat — token-by-token updates
+// ---------------------------------------------------------------------------
+
+/**
+ * Stream chat with the assistant. Each token chunk is passed to onStreamChunk
+ * with the visible text (think tags stripped in real-time).
+ * Returns the final parsed result once streaming is complete.
+ */
+export async function streamChatWithAssistant(
+  messages: ChatMessage[],
+  lang: string = 'es',
+  mode: 'agent' | 'instructor' = 'agent',
+  onStreamChunk: (visibleText: string) => void,
+  songContexts: SongContext[] = [],
+): Promise<{ reply: string; params?: ParsedMusicRequest; actions?: UIAction[] }> {
+  if (!isConfigured()) {
+    return mockChatResponse(messages);
+  }
+
+  try {
+    // Build system prompt with smart truncation for small context windows
+    const systemPrompt = buildSystemPrompt(mode, lang, songContexts);
+
+    // Convert and trim conversation history
+    const allLLMMessages: LLMMessage[] = messages
+      .filter(m => m.role === 'user' || m.role === 'assistant')
+      .map(m => ({ role: m.role as 'user' | 'assistant', content: m.content }));
+
+    const systemTokens = estimateTokens(systemPrompt);
+    const maxConvoTokens = Math.max(500, SYSTEM_PROMPT_BUDGET * 2 - systemTokens);
+    let llmMessages = allLLMMessages;
+    let convoTokens = estimateTokens(llmMessages.map(m => m.content).join(''));
+    while (convoTokens > maxConvoTokens && llmMessages.length > 2) {
+      llmMessages = llmMessages.slice(2);
+      convoTokens = estimateTokens(llmMessages.map(m => m.content).join(''));
+    }
+
+    // Track if we're inside a <think> block for real-time stripping
+    let insideThink = false;
+    let thinkBuffer = '';
+
+    const response = await sendChatStream(
+      llmMessages,
+      systemPrompt,
+      (_chunk: string, accumulated: string) => {
+        // Real-time <think> stripping for display
+        // We process the full accumulated text to determine visible portion
+        let visible = accumulated;
+        // Remove complete <think>...</think> blocks
+        visible = visible.replace(/<think>[\s\S]*?<\/think>/gi, '');
+        // If there's an unclosed <think>, hide everything from it onward
+        const openThinkIdx = visible.lastIndexOf('<think>');
+        if (openThinkIdx !== -1) {
+          visible = visible.substring(0, openThinkIdx);
+        }
+        // Remove stray </think>
+        visible = visible.replace(/<\/think>/gi, '');
+        onStreamChunk(visible.trim());
+      },
+    );
+
+    if (response.error) {
+      const config = loadConfig();
+      // Detect context overflow errors
+      if (response.error.includes('context') && (response.error.includes('exceed') || response.error.includes('n_keep'))) {
+        return {
+          reply: `⚠️ **Error: contexto del modelo demasiado pequeño**\n\nEl prompt del sistema (~${systemTokens} tokens) excede el contexto del modelo.\n\n**Solución:** En LM Studio → Model Settings → aumenta **Context Length** a **8192** o más (16384 recomendado).\n\nAlternativamente, usa un modelo con mayor contexto.`,
+        };
+      }
+      return {
+        reply: `⚠️ Error from ${config.provider}: ${response.error}\n\nCheck your connection in Settings → AI Assistant.`,
+      };
+    }
+
+    const rawReply = response.text || "I couldn't process that. Could you try again?";
+    const { cleanText: afterActions, actions } = parseUIActions(rawReply);
+    const params = extractJsonParams(afterActions);
+    const cleanedReply = cleanReply(afterActions);
+
+    return {
+      reply: cleanedReply,
+      params: params || undefined,
+      actions: actions.length > 0 ? actions : undefined,
+    };
+  } catch (error: any) {
+    console.error("Stream chat error:", error);
+    const msg = error?.message || 'Unknown error';
+    // Detect context overflow in thrown errors too
+    if (msg.includes('context') && (msg.includes('exceed') || msg.includes('n_keep'))) {
+      return {
+        reply: `⚠️ **Error: contexto del modelo demasiado pequeño**\n\nEl prompt excede el contexto del modelo.\n\n**Solución:** En LM Studio → Model Settings → aumenta **Context Length** a **8192** o más.`,
+      };
+    }
+    return {
+      reply: `⚠️ Error connecting to AI: ${msg}. Check Settings → AI Assistant.`,
     };
   }
 }
@@ -214,8 +494,15 @@ function extractJsonParams(text: string): ParsedMusicRequest | null {
 }
 
 function cleanReply(text: string): string {
+  // Remove <think>...</think> blocks (LLM chain-of-thought reasoning)
+  let cleaned = text.replace(/<think>[\s\S]*?<\/think>/gi, '');
+  // Remove orphaned <think> (unclosed — strip from <think> to end)
+  cleaned = cleaned.replace(/<think>[\s\S]*/gi, '');
+  // Remove orphaned </think> (closing without opening)
+  cleaned = cleaned.replace(/<\/think>/gi, '');
   // Remove JSON block from visible reply
-  return text.replace(/```json\s*[\s\S]*?\s*```/g, '').trim();
+  cleaned = cleaned.replace(/```json\s*[\s\S]*?\s*```/g, '');
+  return cleaned.trim();
 }
 
 async function mockChatResponse(messages: ChatMessage[]): Promise<{ reply: string; params?: ParsedMusicRequest }> {

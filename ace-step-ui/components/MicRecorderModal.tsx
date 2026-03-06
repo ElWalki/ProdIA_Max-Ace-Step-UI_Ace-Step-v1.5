@@ -5,7 +5,7 @@
 import React, { useState, useEffect, useRef, useCallback } from 'react';
 import { Mic, Square, Play, Pause, X, Upload, Music, Waves, Trash2, Timer, FileText, Type, Languages, Cpu, Download, Info, Check, ChevronDown } from 'lucide-react';
 import { generateApi } from '../services/api';
-import { useTranslation } from 'react-i18next';
+import { useI18n } from '../context/I18nContext';
 
 // ---------------------------------------------------------------------------
 // Types
@@ -46,7 +46,7 @@ function formatTime(seconds: number): string {
 // ---------------------------------------------------------------------------
 
 export function MicRecorderModal({ isOpen, onClose, onApply, initialLyrics, token }: MicRecorderModalProps) {
-  const { t } = useTranslation();
+  const { t } = useI18n();
 
   // Recording state
   const [isRecording, setIsRecording] = useState(false);

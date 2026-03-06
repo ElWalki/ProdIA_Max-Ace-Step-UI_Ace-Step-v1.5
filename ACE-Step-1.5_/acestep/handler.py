@@ -2984,6 +2984,9 @@ class AceStepHandler:
                     # Convert to the format expected by the service: List[List[torch.Tensor]]
                     # Each batch item has a list of reference audios
                     refer_audios = [[processed_ref_audio] for _ in range(actual_batch_size)]
+                else:
+                    logger.warning("[generate_music] Reference audio failed to load, falling back to silence")
+                    refer_audios = [[torch.zeros(2, 30*self.sample_rate)] for _ in range(actual_batch_size)]
             else:
                 refer_audios = [[torch.zeros(2, 30*self.sample_rate)] for _ in range(actual_batch_size)]
             

@@ -6,48 +6,141 @@ cd /d "%~dp0"
 echo.
 echo ╔══════════════════════════════════════════════════════════╗
 echo ║   ProdIA pro - Inicio Completo / Full Start              ║
-echo ║   Gradio API + Backend + Frontend (con soporte LoRA)     ║
+echo ║   Setup + Gradio API + Backend + Frontend                ║
+echo ║   (con soporte LoRA / with LoRA support)                 ║
 echo ╚══════════════════════════════════════════════════════════╝
 echo.
 
 REM ─── Rutas / Paths ──────────────────────────────────────────
 set "ACESTEP_DIR=%~dp0ACE-Step-1.5_"
 set "UI_DIR=%~dp0ace-step-ui"
+set "VENV=%ACESTEP_DIR%\.venv"
+
+REM ─── Verificar Node.js / Check Node.js ──────────────────────
+where node >nul 2>&1
+if %errorlevel% neq 0 (
+    echo  [ERROR] Node.js no encontrado / Node.js not found.
+    echo          Instala Node.js 18+ desde / Install Node.js 18+ from:
+    echo          https://nodejs.org/
+    pause
+    exit /b 1
+)
 
 REM ─── Detectar Python / Detect Python ────────────────────────
 set "PYTHON="
+set "BASE_PYTHON="
 if exist "%ACESTEP_DIR%\python_embeded\python.exe" (
     set "PYTHON=%ACESTEP_DIR%\python_embeded\python.exe"
     echo  [Python] Usando python_embeded / Using embedded python
     goto :PYTHON_OK
 )
-if exist "%ACESTEP_DIR%\.venv\Scripts\python.exe" (
-    set "PYTHON=%ACESTEP_DIR%\.venv\Scripts\python.exe"
-    echo  [Python] Usando .venv / Using .venv
+if exist "%VENV%\Scripts\python.exe" (
+    set "PYTHON=%VENV%\Scripts\python.exe"
+    echo  [Python] Usando .venv existente / Using existing .venv
     goto :PYTHON_OK
 )
 python --version >nul 2>&1
 if %errorlevel% equ 0 (
-    set "PYTHON=python"
-    echo  [Python] Usando Python del sistema / Using system Python
-    goto :PYTHON_OK
+    for /f "tokens=*" %%i in ('where python') do set "BASE_PYTHON=%%i" & goto :GOT_SYS_PYTHON
+    :GOT_SYS_PYTHON
+    echo  [Python] Python del sistema encontrado / System Python found
+    goto :CREATE_VENV
 )
-echo  [ERROR] No se encontro Python / Python not found. Ejecuta / Run: setup.bat
+py --version >nul 2>&1
+if %errorlevel% equ 0 (
+    set "BASE_PYTHON=py"
+    echo  [Python] Python launcher encontrado / Python launcher found
+    goto :CREATE_VENV
+)
+echo  [ERROR] No se encontro Python / Python not found.
+echo          Instala Python 3.10 o 3.11 desde / Install Python 3.10 or 3.11 from:
+echo          https://www.python.org/downloads/
+echo          Asegurate de marcar "Add Python to PATH"
 pause
 exit /b 1
+
+:CREATE_VENV
+echo.
+echo  [Setup] Creando entorno virtual / Creating virtual environment...
+if exist "%VENV%" (
+    echo         Ya existe, omitiendo / Already exists, skipping.
+) else (
+    "%BASE_PYTHON%" -m venv "%VENV%"
+    if %errorlevel% neq 0 (
+        echo  [ERROR] No se pudo crear el venv / Could not create venv.
+        pause
+        exit /b 1
+    )
+    echo         Creado correctamente / Created successfully.
+)
+set "PYTHON=%VENV%\Scripts\python.exe"
+
 :PYTHON_OK
+
+REM ─── Instalar dependencias Python si es necesario ────────────
+REM     Solo instala si no existe el marker o si requirements.txt cambio
+REM     Install Python deps only if marker missing or requirements.txt changed
+set "PY_MARKER=%ACESTEP_DIR%\.deps_installed"
+set "NEED_PY_INSTALL=0"
+if not exist "%PY_MARKER%" set "NEED_PY_INSTALL=1"
+if "%NEED_PY_INSTALL%"=="0" (
+    REM Comprobar si requirements.txt es mas nuevo que el marker
+    for /f "tokens=*" %%a in ('powershell -NoProfile -Command "if ((Get-Item \"%ACESTEP_DIR%\requirements.txt\" -ErrorAction SilentlyContinue).LastWriteTime -gt (Get-Item \"%PY_MARKER%\" -ErrorAction SilentlyContinue).LastWriteTime) { echo 1 } else { echo 0 }"') do set "NEED_PY_INSTALL=%%a"
+)
+if "%NEED_PY_INSTALL%"=="1" (
+    echo.
+    echo  [Setup] Instalando dependencias Python / Installing Python dependencies...
+    echo          Esto puede tardar varios minutos / This may take several minutes...
+    echo.
+    "%PYTHON%" -m pip install --upgrade pip >nul 2>&1
+    if exist "%ACESTEP_DIR%\requirements.txt" (
+        "%PYTHON%" -m pip install -r "%ACESTEP_DIR%\requirements.txt"
+        if %errorlevel% neq 0 (
+            echo.
+            echo  [AVISO / WARNING] Algunos paquetes pueden haber fallado.
+            echo          Si es CUDA/torch, instala manualmente segun tu GPU:
+            echo          https://pytorch.org/get-started/locally/
+            echo.
+            pause
+        ) else (
+            echo. > "%PY_MARKER%"
+            echo  [OK] Dependencias Python instaladas / Python deps installed.
+        )
+    )
+) else (
+    echo  [OK] Dependencias Python ya instaladas / Python deps already installed.
+)
+
+REM ─── Instalar dependencias Node.js ───────────────────────────
 if not exist "%UI_DIR%\node_modules" (
-    echo  [ERROR] Dependencias UI no instaladas / UI dependencies not installed.
-    echo  Ejecuta / Run: setup.bat
-    pause
-    exit /b 1
+    echo  [!] Dependencias UI no instaladas / UI deps not installed. Instalando / Installing...
+    cd /d "%UI_DIR%"
+    call npm install
+    if %errorlevel% neq 0 (
+        echo  [ERROR] npm install fallo / failed.
+        pause
+        exit /b 1
+    )
+) else (
+    echo  [*] Verificando dependencias UI / Checking UI deps...
+    cd /d "%UI_DIR%"
+    call npm install --prefer-offline >nul 2>&1
 )
 if not exist "%UI_DIR%\server\node_modules" (
-    echo  [ERROR] Dependencias backend no instaladas / Backend dependencies not installed.
-    echo  Ejecuta / Run: setup.bat
-    pause
-    exit /b 1
+    echo  [!] Dependencias backend no instaladas / Backend deps not installed. Instalando / Installing...
+    cd /d "%UI_DIR%\server"
+    call npm install
+    if %errorlevel% neq 0 (
+        echo  [ERROR] npm install fallo / failed.
+        pause
+        exit /b 1
+    )
+) else (
+    echo  [*] Verificando dependencias backend / Checking backend deps...
+    cd /d "%UI_DIR%\server"
+    call npm install --prefer-offline >nul 2>&1
 )
+cd /d "%~dp0"
 
 REM ─── Matar procesos previos / Kill previous processes ────────
 echo  [0/3] Liberando puertos / Freeing ports (8001, 3001, 3000)...

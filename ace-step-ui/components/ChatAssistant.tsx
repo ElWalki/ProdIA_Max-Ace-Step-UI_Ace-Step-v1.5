@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useCallback, useMemo } from 'react';
-import { MessageSquare, X, Send, Loader2, Music, Sparkles, ChevronDown, Zap, Code2, ClipboardPaste, FileEdit, Replace, Disc3, Settings2, CheckCircle2, ToggleLeft, ToggleRight, Play, Pause, Square, Volume2, Palette, Plus, SkipForward, SkipBack, Edit3, Check, Trash2, GripVertical, Minimize2, Globe } from 'lucide-react';
+import { MessageSquare, X, Send, Loader2, Music, Sparkles, ChevronDown, ArrowDown, Zap, Code2, ClipboardPaste, FileEdit, Replace, Disc3, Settings2, CheckCircle2, ToggleLeft, ToggleRight, Play, Pause, Square, Volume2, Palette, Plus, SkipForward, SkipBack, Edit3, Check, Trash2, GripVertical, Minimize2, Globe } from 'lucide-react';
 import { useI18n } from '../context/I18nContext';
-import { chatWithAssistant, formatParamsForDisplay, ChatMessage, ParsedMusicRequest } from '../services/chatService';
+import { chatWithAssistant, streamChatWithAssistant, formatParamsForDisplay, ChatMessage, ParsedMusicRequest, SongContext } from '../services/chatService';
 import { ChordProgressionEditor, InlineChordPreview, ChordProgressionState } from './ChordProgressionEditor';
 import { resolveProgression, formatProgressionForGeneration, CHORD_PRESETS, ScaleType } from '../services/chordService';
 import { loadConfig, PROVIDERS } from '../services/llmProviderService';
@@ -53,6 +53,16 @@ function renderMarkdown(text: string): React.ReactNode[] {
     return parts.length > 0 ? <span key={key}>{parts}</span> : <span key={key}>{line}</span>;
   };
 
+  // Helper: parse a table row into cells
+  const parseTableRow = (row: string): string[] => {
+    return row.split('|').slice(1, -1).map(cell => cell.trim());
+  };
+
+  // Helper: check if a line is a table separator (|---|---|)
+  const isTableSeparator = (line: string): boolean => {
+    return /^\|[\s\-:]+(\|[\s\-:]+)+\|?\s*$/.test(line.trim());
+  };
+
   for (let i = 0; i < lines.length; i++) {
     const line = lines[i];
 
@@ -85,6 +95,63 @@ function renderMarkdown(text: string): React.ReactNode[] {
       continue;
     }
 
+    // ── TABLE detection ──
+    // A table starts with a | line, followed by a separator |---|, then more | lines
+    if (line.trim().startsWith('|') && i + 1 < lines.length && isTableSeparator(lines[i + 1])) {
+      const headerCells = parseTableRow(line);
+      i++; // skip separator line
+      const bodyRows: string[][] = [];
+      while (i + 1 < lines.length && lines[i + 1].trim().startsWith('|') && !isTableSeparator(lines[i + 1])) {
+        i++;
+        bodyRows.push(parseTableRow(lines[i]));
+      }
+      elements.push(
+        <div key={`tbl-${i}`} className="overflow-x-auto my-1.5">
+          <table className="w-full text-[12px] border-collapse">
+            <thead>
+              <tr className="border-b border-purple-500/30">
+                {headerCells.map((cell, ci) => (
+                  <th key={ci} className="text-left text-purple-300 font-semibold px-2 py-1.5 bg-purple-500/10">
+                    {renderInline(cell, `th-${i}-${ci}`)}
+                  </th>
+                ))}
+              </tr>
+            </thead>
+            <tbody>
+              {bodyRows.map((row, ri) => (
+                <tr key={ri} className="border-b border-zinc-700/30 hover:bg-white/[0.02]">
+                  {row.map((cell, ci) => (
+                    <td key={ci} className="px-2 py-1.5 text-zinc-300">
+                      {renderInline(cell, `td-${i}-${ri}-${ci}`)}
+                    </td>
+                  ))}
+                </tr>
+              ))}
+            </tbody>
+          </table>
+        </div>
+      );
+      continue;
+    }
+
+    // ── HEADINGS ──
+    const headingMatch = line.match(/^(#{1,3})\s+(.+)$/);
+    if (headingMatch) {
+      const level = headingMatch[1].length;
+      const headingText = headingMatch[2];
+      const hClass = level === 1
+        ? 'text-[15px] font-bold text-white mt-2 mb-1'
+        : level === 2
+          ? 'text-[14px] font-semibold text-white mt-1.5 mb-0.5'
+          : 'text-[13px] font-semibold text-zinc-200 mt-1 mb-0.5';
+      elements.push(
+        <div key={`h${level}-${i}`} className={hClass}>
+          {renderInline(headingText, `h-c-${i}`)}
+        </div>
+      );
+      continue;
+    }
+
     // Bullet point lines (• or - at start)
     if (/^\s*[•\-\*]\s/.test(line)) {
       const bulletContent = line.replace(/^\s*[•\-\*]\s+/, '');
@@ -92,6 +159,18 @@ function renderMarkdown(text: string): React.ReactNode[] {
         <div key={`li-${i}`} className="flex gap-1.5 ml-1">
           <span className="text-purple-400 flex-shrink-0">•</span>
           <span>{renderInline(bulletContent, `li-c-${i}`)}</span>
+        </div>
+      );
+      continue;
+    }
+
+    // ── NUMBERED LIST (1. text) ──
+    const numberedMatch = line.match(/^\s*(\d+)[.)]\s+(.+)$/);
+    if (numberedMatch) {
+      elements.push(
+        <div key={`nl-${i}`} className="flex gap-1.5 ml-1">
+          <span className="text-purple-400 flex-shrink-0 min-w-[1.2em] text-right">{numberedMatch[1]}.</span>
+          <span>{renderInline(numberedMatch[2], `nl-c-${i}`)}</span>
         </div>
       );
       continue;
@@ -120,11 +199,19 @@ interface PendingActionItem {
   label: string;
 }
 
+interface AudioCodeEntry {
+  songId: string;
+  title: string;
+  codes: string;
+  codeCount: number;
+  extractedAt: Date;
+}
+
 interface ChatAssistantProps {
   onApplyParams: (params: ParsedMusicRequest) => void;
   onGenerateWithParams: (params: ParsedMusicRequest) => void;
   onSetLyrics: (lyrics: string, mode: 'overwrite' | 'append') => void;
-  audioCodes?: string;
+  generatedCodes?: AudioCodeEntry[];
   isGenerating?: boolean;
   lastGeneratedSong?: Song | null;
   // Workspace playback sync
@@ -139,9 +226,12 @@ interface ChatAssistantProps {
   songs?: Song[];
 }
 
-export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics, audioCodes, isGenerating, lastGeneratedSong, currentSong, isPlaying, currentTime = 0, duration = 0, onPlaySong, onTogglePlay, onSeek, songs }: ChatAssistantProps) {
+export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics, generatedCodes, isGenerating, lastGeneratedSong, currentSong, isPlaying, currentTime = 0, duration = 0, onPlaySong, onTogglePlay, onSeek, songs }: ChatAssistantProps) {
+  const { t } = useI18n();
   const [isOpen, setIsOpen] = useState(false);
   const [activeTab, setActiveTab] = useState<'chat' | 'codes' | 'chords'>('chat');
+  // Expanded codes entries
+  const [expandedCodeId, setExpandedCodeId] = useState<string | null>(null);
   // Agent mode: 'agent' = AI applies changes directly, 'instructor' = AI only explains
   const [agentMode, setAgentMode] = useState<'agent' | 'instructor'>(() => {
     try { return (localStorage.getItem('prodiaChat_mode') as any) || 'agent'; } catch { return 'agent'; }
@@ -150,7 +240,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
     {
       id: 'welcome',
       role: 'system',
-      content: 'Asistente de producción musical — ProdIA Pro\n\nTengo control total sobre ACE-Step. Puedo configurar parámetros, generar música y ajustar cualquier aspecto de tu producción.\n\nEjemplos:\n• "Hazme un reggaetón a 95 bpm"\n• "Quiero una balada de rock en español"\n• "Sube la calidad al máximo"\n• "¿Qué modelo me recomiendas?"',
+      content: t('chatAssistant.welcomeMessage'),
       timestamp: new Date(),
     }
   ]);
@@ -188,15 +278,74 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
   });
   const isResizing = useRef(false);
   const prevIsGenerating = useRef(isGenerating);
-  const { t } = useI18n();
   const messagesEndRef = useRef<HTMLDivElement>(null);
   const inputRef = useRef<HTMLTextAreaElement>(null);
   const chatPanelRef = useRef<HTMLDivElement>(null);
+  const messagesContainerRef = useRef<HTMLDivElement>(null);
+  const userScrolledUp = useRef(false);
+  // Notification badge — counts unread assistant messages while panel is closed
+  const [unreadCount, setUnreadCount] = useState(0);
+  // Show/hide scroll-to-bottom button
+  const [showScrollBtn, setShowScrollBtn] = useState(false);
 
-  // Auto-scroll to bottom
+  // Track new assistant messages while panel is closed → increment unread
+  const prevMsgCount = useRef(messages.length);
   useEffect(() => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    if (messages.length > prevMsgCount.current) {
+      const newMsgs = messages.slice(prevMsgCount.current);
+      const newAssistant = newMsgs.filter(m => m.role === 'assistant').length;
+      if (newAssistant > 0 && !isOpen) {
+        setUnreadCount(prev => prev + newAssistant);
+      }
+    }
+    prevMsgCount.current = messages.length;
+  }, [messages, isOpen]);
+
+  // Clear notification & scroll to bottom when panel opens
+  useEffect(() => {
+    if (isOpen) {
+      setUnreadCount(0);
+      // Scroll to bottom immediately on open
+      userScrolledUp.current = false;
+      setTimeout(() => {
+        messagesEndRef.current?.scrollIntoView({ behavior: 'auto' });
+      }, 50);
+    }
+  }, [isOpen]);
+
+  // Smart auto-scroll: follow new messages / streaming chunks unless user scrolled up
+  useEffect(() => {
+    if (!userScrolledUp.current) {
+      messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+    } else {
+      // User scrolled up — show scroll-to-bottom button
+      setShowScrollBtn(true);
+    }
   }, [messages]);
+
+  // Detect if user scrolled up (stop auto-scroll) or back to bottom (resume)
+  useEffect(() => {
+    const container = messagesContainerRef.current;
+    if (!container) return;
+    const handleScroll = () => {
+      const { scrollTop, scrollHeight, clientHeight } = container;
+      const distFromBottom = scrollHeight - scrollTop - clientHeight;
+      // If within 80px of bottom, consider "at bottom"
+      const atBottom = distFromBottom <= 80;
+      userScrolledUp.current = !atBottom;
+      // Show/hide scroll button
+      setShowScrollBtn(!atBottom && distFromBottom > 150);
+    };
+    container.addEventListener('scroll', handleScroll, { passive: true });
+    return () => container.removeEventListener('scroll', handleScroll);
+  }, []);
+
+  // Scroll-to-bottom helper
+  const scrollToBottom = useCallback(() => {
+    userScrolledUp.current = false;
+    setShowScrollBtn(false);
+    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
+  }, []);
 
   // Focus input when opened
   useEffect(() => {
@@ -207,10 +356,10 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
 
   // Update codes tab when new audio codes arrive
   useEffect(() => {
-    if (audioCodes && audioCodes.trim()) {
+    if (generatedCodes && generatedCodes.length > 0) {
       setShowCodes(true);
     }
-  }, [audioCodes]);
+  }, [generatedCodes]);
 
   // Detect generation completion → inject song card into chat
   useEffect(() => {
@@ -279,15 +428,10 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
 
   // Clear chat
   const clearChat = () => {
-    const welcomeMsg = chatLang === 'en'
-      ? 'Music production assistant — ProdIA Pro\n\nI have full control over ACE-Step. I can configure parameters, generate music, and adjust any aspect of your production.\n\nExamples:\n• "Make me a reggaeton at 95 bpm"\n• "I want an emotional rock ballad"\n• "Max out the quality"\n• "Which model do you recommend?"'
-      : chatLang === 'zh'
-        ? '音乐制作助手 — ProdIA Pro\n\n我可以完全控制ACE-Step。配置参数、生成音乐、调整制作的任何方面。\n\n示例：\n• "帮我做一首95 bpm的雷鬼"\n• "我想要一首感人的摇滚民谣"\n• "把质量调到最高"\n• "你推荐哪个模型？"'
-        : 'Asistente de producción musical — ProdIA Pro\n\nTengo control total sobre ACE-Step. Puedo configurar parámetros, generar música y ajustar cualquier aspecto de tu producción.\n\nEjemplos:\n• "Hazme un reggaetón a 95 bpm"\n• "Quiero una balada de rock en español"\n• "Sube la calidad al máximo"\n• "¿Qué modelo me recomiendas?"';
     setMessages([{
       id: 'welcome',
       role: 'system',
-      content: welcomeMsg,
+      content: t('chatAssistant.welcomeMessage'),
       timestamp: new Date(),
     }]);
     setPendingActionsMap({});
@@ -298,12 +442,6 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
   // Quick generate from chat (dispatches to UI bridge directly)
   const handleChatGenerate = () => {
     uiBridge.dispatch({ type: 'generate' });
-    setMessages(prev => [...prev, {
-      id: `system-${Date.now()}`,
-      role: 'system',
-      content: '🚀 ¡Generación lanzada! El track aparecerá aquí cuando esté listo 🎵',
-      timestamp: new Date(),
-    }]);
   };
 
   // Apply chord progression to generation (inject into style + lyrics + bpm + key via UIBridge)
@@ -332,25 +470,18 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
 
       uiBridge.dispatch({ type: 'set', params });
     }
-    // Add a system message confirming the action
-    setMessages(prev => [...prev, {
-      id: `chord-apply-${Date.now()}`,
-      role: 'system',
-      content: `🎹 Progresión aplicada: ${data.description}${data.bpmTag ? ` • ${data.bpmTag} BPM` : ''}`,
-      timestamp: new Date(),
-    }]);
   };
   const formatActionLabel = (action: UIAction): string => {
     if (action.type === 'set') {
       const keys = Object.keys(action.params).filter(k => (action.params as any)[k] !== undefined);
       return keys.map(k => `${k}: ${JSON.stringify((action.params as any)[k])}`).join(', ');
     }
-    if (action.type === 'generate') return '🚀 Generar canción';
-    if (action.type === 'swapModel') return `🤖 Cambiar modelo → ${action.model}`;
-    if (action.type === 'purgeVram') return '💾 Purgar VRAM';
-    if (action.type === 'loadLora') return `🧬 Cargar LoRA: ${action.name}`;
+    if (action.type === 'generate') return t('chatAssistant.formatActionGenerate');
+    if (action.type === 'swapModel') return t('chatAssistant.formatActionSwapModel', { model: action.model });
+    if (action.type === 'purgeVram') return t('chatAssistant.formatActionPurgeVram');
+    if (action.type === 'loadLora') return t('chatAssistant.formatActionLoadLora', { name: action.name });
     if (action.type === 'unloadLora') return t('chatAssistant.formatActionUnloadLora');
-    return (action as any).type || 'acción';
+    return (action as any).type || t('chatAssistant.formatActionDefault');
   };
 
   // Helper: toggle a pending action
@@ -382,21 +513,10 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
       return rest;
     });
     if (applied > 0) {
-      const hypeMessages = [
-        '¿Generamos o ajusto algo más?',
-        '¿Lanzamos la generación?',
-        '¿Algún cambio más antes de generar?',
-      ];
-      const randomHype = hypeMessages[Math.floor(Math.random() * hypeMessages.length)];
       setMessages(prev => [...prev, {
         id: `action-confirm-${Date.now()}`,
         role: 'system',
-        content: `✅ ${applied} ${applied === 1 ? 'cambio aplicado' : 'cambios aplicados'}.`,
-        timestamp: new Date(),
-      }, {
-        id: `suggest-${Date.now() + 1}`,
-        role: 'system',
-        content: `💡 ${randomHype}`,
+        content: `✅ ${applied === 1 ? t('chatAssistant.appliedChange', { n: applied }) : t('chatAssistant.appliedChanges', { n: applied })}.`,
         timestamp: new Date(),
       }]);
     }
@@ -454,12 +574,6 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
   const saveStyleEdit = () => {
     uiBridge.dispatch({ type: 'set', params: { style: styleEditValue } });
     setEditingStyle(false);
-    setMessages(prev => [...prev, {
-      id: `system-${Date.now()}`,
-      role: 'system',
-      content: '🎨 Estilo actualizado.',
-      timestamp: new Date(),
-    }]);
   };
 
   // Extract style/tags from assistant message
@@ -487,19 +601,6 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
       ? `${currentState.style}, ${style}`
       : style;
     uiBridge.dispatch({ type: 'set', params: { style: newStyle } });
-    setMessages(prev => [...prev, {
-      id: `system-${Date.now()}`,
-      role: 'system',
-      content: mode === 'overwrite'
-        ? '🎨 Estilo aplicado en el panel.'
-        : '🎨 Estilo añadido al existente.',
-      timestamp: new Date(),
-    }, {
-      id: `suggest-${Date.now()}`,
-      role: 'system',
-      content: '💡 ¿Ajusto algo más o generamos?',
-      timestamp: new Date(),
-    }]);
   };
 
   // Extract lyrics from assistant message (text between [Verse], [Chorus], etc.)
@@ -555,15 +656,55 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
     setInput('');
     setIsLoading(true);
 
+    const msgId = `assistant-${Date.now()}`;
+
+    // Add a placeholder assistant message that will be updated during streaming
+    const streamingMsg: ChatMessage = {
+      id: msgId,
+      role: 'assistant',
+      content: '',
+      timestamp: new Date(),
+      isGenerating: true,
+    };
+    setMessages(prev => [...prev, streamingMsg]);
+
     try {
       const allMessages = [...messages.filter(m => m.role !== 'system'), userMsg];
-      const { reply, params, actions } = await chatWithAssistant(allMessages, chatLang, agentMode);
+
+      // Build song contexts for the LLM system prompt
+      const songContextsForLLM: SongContext[] = contextSongs.map(song => {
+        const gp = song.generationParams || {};
+        return {
+          title: song.title || t('chatAssistant.untitledSong'),
+          style: song.style || undefined,
+          lyrics: song.lyrics || undefined,
+          bpm: gp.bpm ? Number(gp.bpm) : undefined,
+          keyScale: gp.keyScale || gp.key_scale || gp.key || undefined,
+          timeSignature: gp.timeSignature || gp.time_signature || undefined,
+          duration: song.duration || undefined,
+          instrumental: gp.instrumental || undefined,
+          vocalLanguage: gp.vocalLanguage || gp.vocal_language || undefined,
+          model: gp.ditModel || song.ditModel || undefined,
+          tags: Array.isArray(song.tags) ? song.tags : typeof song.tags === 'string' ? (song.tags as string).split(',').map((t: string) => t.trim()).filter(Boolean) : undefined,
+        };
+      });
+
+      const { reply, params, actions } = await streamChatWithAssistant(
+        allMessages,
+        chatLang,
+        agentMode,
+        (visibleText: string) => {
+          // Update the streaming message content in real-time
+          setMessages(prev => prev.map(m =>
+            m.id === msgId ? { ...m, content: visibleText } : m
+          ));
+        },
+        songContextsForLLM,
+      );
 
       if (params) {
         setLastParams(params);
       }
-
-      const msgId = `assistant-${Date.now()}`;
 
       // Store actions as PENDING (not auto-applied) — user reviews & applies
       if (actions && actions.length > 0) {
@@ -575,23 +716,24 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
         setPendingActionsMap(prev => ({ ...prev, [msgId]: pendingItems }));
       }
 
-      const assistantMsg: ChatMessage = {
-        id: msgId,
-        role: 'assistant',
-        content: reply,
-        timestamp: new Date(),
-        parsedParams: params,
-        actions,
-      };
-
-      setMessages(prev => [...prev, assistantMsg]);
+      // Finalize message with full cleaned reply and parsed data
+      setMessages(prev => prev.map(m =>
+        m.id === msgId ? {
+          ...m,
+          content: reply,
+          parsedParams: params,
+          actions,
+          isGenerating: false,
+        } : m
+      ));
     } catch (error) {
-      setMessages(prev => [...prev, {
-        id: `error-${Date.now()}`,
-        role: 'assistant',
-        content: t('chatAssistant.errorMessage'),
-        timestamp: new Date(),
-      }]);
+      setMessages(prev => prev.map(m =>
+        m.id === msgId ? {
+          ...m,
+          content: t('chatAssistant.errorMessage'),
+          isGenerating: false,
+        } : m
+      ));
     } finally {
       setIsLoading(false);
     }
@@ -606,44 +748,14 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
 
   const handleApply = (params: ParsedMusicRequest) => {
     onApplyParams(params);
-    setMessages(prev => [...prev, {
-      id: `system-${Date.now()}`,
-      role: 'system',
-      content: '✅ ¡Parámetros aplicados! Todo listo en el panel 🎶',
-      timestamp: new Date(),
-    }, {
-      id: `suggest-${Date.now() + 1}`,
-      role: 'system',
-      content: '💡 ¿Generamos esto ya o le hacemos algún retoque más? 🚀',
-      timestamp: new Date(),
-    }]);
   };
 
   const handleGenerateNow = (params: ParsedMusicRequest) => {
     onGenerateWithParams(params);
-    setMessages(prev => [...prev, {
-      id: `system-${Date.now()}`,
-      role: 'system',
-      content: '🚀 ¡Vamos allá! Generando tu track... ¡Esto va a ser épico! 🔥🎵',
-      timestamp: new Date(),
-    }]);
   };
 
   const handlePasteLyrics = (lyrics: string, mode: 'overwrite' | 'append') => {
     onSetLyrics(lyrics, mode);
-    setMessages(prev => [...prev, {
-      id: `system-${Date.now()}`,
-      role: 'system',
-      content: mode === 'overwrite'
-        ? '📝 ¡Letra pegada! Echa un ojo al panel 👀'
-        : '📝 ¡Letra añadida al final! Quedó perfecta 🔥',
-      timestamp: new Date(),
-    }, {
-      id: `suggest-${Date.now() + 1}`,
-      role: 'system',
-      content: '💡 ¿Quieres que le ajuste el estilo también o generamos ya? 🚀',
-      timestamp: new Date(),
-    }]);
   };
 
   const handleQuickGenerate = () => {
@@ -656,7 +768,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
   const formatSongContext = (song: Song, index: number): string => {
     const gp = song.generationParams || {};
     const parts: string[] = [];
-    parts.push(`═══ Canción ${index + 1}: **${song.title || 'Sin título'}** ═══`);
+    parts.push(`═══ Canción ${index + 1}: **${song.title || t('chatAssistant.untitledSong')}** ═══`);
     if (song.id) parts.push(`🔗 URL: http://localhost:3000/song/${song.id}`);
     if (song.style) parts.push(`🎨 Estilo/Tags: ${song.style}`);
     if (song.duration) parts.push(`⏱ Duración: ${song.duration}`);
@@ -710,9 +822,9 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
 
         let promptText: string;
         if (totalSongs === 1) {
-          promptText = `📎 He cargado una canción como contexto:\n\n${contextText}\n\n¿Qué quieres hacer con ella? Puedo:\n• Analizar sus parámetros y composición\n• Sugerir mejoras de letra o estilo\n• Generar una canción similar\n• Modificar parámetros específicos\n\n💡 Puedes arrastrar hasta 3 canciones para combinarlas.`;
+          promptText = t('chatAssistant.songDropSingle', { context: contextText });
         } else {
-          promptText = `📎 He añadido la Canción ${slotNum + 1} al contexto (${totalSongs}/3 slots):\n\n${contextText}\n\nAhora tengo ${totalSongs} canciones cargadas. Puedo:\n• Fusionar estilos de las ${totalSongs} canciones\n• Usar la letra de una + el estilo de otra\n• Tomar el BPM/key de una y aplicarlo a otra\n• Crear algo totalmente nuevo basado en todas\n\n¿Qué combinación quieres?`;
+          promptText = t('chatAssistant.songDropMulti', { slot: slotNum + 1, total: totalSongs, context: contextText });
         }
 
         setMessages(msgs => [...msgs, {
@@ -758,16 +870,18 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
           flex items-center justify-center transition-all duration-300
           ${isOpen 
             ? 'bg-zinc-700 hover:bg-zinc-600 rotate-0' 
-            : 'bg-gradient-to-br from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 animate-pulse hover:animate-none'
+            : unreadCount > 0
+              ? 'bg-gradient-to-br from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500 animate-bounce hover:animate-none'
+              : 'bg-gradient-to-br from-purple-600 to-violet-600 hover:from-purple-500 hover:to-violet-500'
           }
           text-white
         `}
         title={t('chatAssistant.buttonTitle')}
       >
         {isOpen ? <X size={22} /> : <MessageSquare size={22} />}
-        {!isOpen && messages.filter(m => m.parsedParams).length > 0 && (
-          <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full text-[10px] flex items-center justify-center font-bold">
-            {messages.filter(m => m.parsedParams).length}
+        {!isOpen && unreadCount > 0 && (
+          <span className="absolute -top-1 -right-1 w-5 h-5 bg-green-500 rounded-full text-[10px] flex items-center justify-center font-bold animate-pulse">
+            {unreadCount}
           </span>
         )}
       </button>
@@ -819,10 +933,10 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
             <div className="absolute inset-0 z-50 bg-purple-600/10 backdrop-blur-[2px] rounded-2xl flex flex-col items-center justify-center gap-3 pointer-events-none">
               <Disc3 size={40} className="text-purple-400 animate-spin" style={{ animationDuration: '3s' }} />
               <span className="text-sm text-purple-300 font-semibold">
-                {contextSongs.length === 0 ? 'Soltar canci\u00f3n para analizar' : `A\u00f1adir como Canci\u00f3n ${Math.min(contextSongs.length + 1, 3)}`}
+                {contextSongs.length === 0 ? t('chatAssistant.dropToAnalyze') : t('chatAssistant.dropToAdd', { n: Math.min(contextSongs.length + 1, 3) })}
               </span>
               <span className="text-[10px] text-purple-400/60">
-                {contextSongs.length >= 3 ? 'Se reemplazar\u00e1 la m\u00e1s antigua (m\u00e1x 3)' : `${contextSongs.length}/3 slots usados`}
+                {contextSongs.length >= 3 ? t('chatAssistant.dropReplaceOldest') : t('chatAssistant.dropSlotsUsed', { n: contextSongs.length })}
               </span>
             </div>
           )}
@@ -892,14 +1006,14 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
               {isGenerating && (
                 <span className="flex items-center gap-1 text-[10px] text-amber-400 bg-amber-400/10 px-2 py-0.5 rounded-full">
                   <Loader2 size={10} className="animate-spin" />
-                  Generando...
+                  {t('chatAssistant.generatingStatus')}
                 </span>
               )}
               {!isGenerating && (
                 <button
                   onClick={handleChatGenerate}
                   className="flex items-center gap-1 text-[10px] text-purple-400 bg-purple-400/10 hover:bg-purple-400/20 px-2.5 py-1 rounded-full transition-colors border border-purple-500/20"
-                  title="Generar con la configuración actual"
+                  title={t('chatAssistant.generateTooltip')}
                 >
                   <Zap size={10} />
                   {t('chatAssistant.createSongQuick')}
@@ -974,20 +1088,20 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                       <button
                         onClick={() => setContextSongs(prev => prev.filter(s => s.id !== song.id))}
                         className="text-zinc-500 hover:text-zinc-300 ml-2 flex-shrink-0"
-                        title={`Quitar Canci\u00f3n ${idx + 1}`}
+                        title={t('chatAssistant.removeSongContext', { n: idx + 1 })}
                       >
                         <X size={10} />
                       </button>
                     </div>
                   ))}
                   {contextSongs.length < 3 && (
-                    <p className="text-[9px] text-zinc-600 text-center">Arrastra m\u00e1s canciones ({contextSongs.length}/3)</p>
+                    <p className="text-[9px] text-zinc-600 text-center">{t('chatAssistant.dragMoreSongs', { n: contextSongs.length })}</p>
                   )}
                 </div>
               )}
 
               {/* Messages */}
-              <div className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700">
+              <div ref={messagesContainerRef} className="flex-1 overflow-y-auto p-3 space-y-3 scrollbar-thin scrollbar-thumb-zinc-700">
                 {messages.map((msg) => {
                   const lyricsInMessage = msg.role === 'assistant' ? extractLyricsFromMessage(msg.content) : null;
                   const lyricsFromParams = msg.parsedParams?.lyrics;
@@ -1087,7 +1201,19 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                           ? 'bg-zinc-800/50 text-zinc-400 text-[11px] italic border border-zinc-700/30'
                           : 'bg-zinc-800 text-zinc-200 rounded-bl-md border border-zinc-700/30'
                     }`}>
-                      <div className="space-y-0.5">{renderMarkdown(msg.content)}</div>
+                      {/* Show streaming cursor or content */}
+                      {msg.isGenerating && !msg.content ? (
+                        <div className="flex items-center gap-1.5">
+                          <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse" />
+                          <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '0.2s' }} />
+                          <span className="w-1.5 h-1.5 bg-purple-400 rounded-full animate-pulse" style={{ animationDelay: '0.4s' }} />
+                        </div>
+                      ) : (
+                        <div className="space-y-0.5">
+                          {renderMarkdown(msg.content)}
+                          {msg.isGenerating && <span className="inline-block w-1.5 h-4 bg-purple-400 animate-pulse ml-0.5 align-text-bottom rounded-sm" />}
+                        </div>
+                      )}
 
                       {/* PENDING Actions — Interactive review panel */}
                       {isPending && (
@@ -1095,7 +1221,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                           <div className="flex items-center gap-1.5 mb-2">
                             <Settings2 size={12} className="text-amber-400" />
                             <span className="text-[10px] font-semibold text-amber-400">
-                              Cambios sugeridos ({pendingItems.filter(i => i.enabled).length}/{pendingItems.length})
+                              {t('chatAssistant.pendingSuggestedChanges', { enabled: pendingItems.filter(i => i.enabled).length, total: pendingItems.length })}
                             </span>
                           </div>
                           <div className="space-y-1">
@@ -1126,7 +1252,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                               className="flex-1 py-1.5 px-3 text-[10px] font-medium bg-amber-600 hover:bg-amber-500 disabled:bg-zinc-700 disabled:text-zinc-500 text-white rounded-md transition-colors flex items-center justify-center gap-1"
                             >
                               <CheckCircle2 size={10} />
-                              Aplicar ({pendingItems.filter(i => i.enabled).length})
+                              {t('chatAssistant.pendingApply', { n: pendingItems.filter(i => i.enabled).length })}
                             </button>
                             <button
                               onClick={() => setPendingActionsMap(prev => { const { [msg.id]: _, ...rest } = prev; return rest; })}
@@ -1144,7 +1270,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                           <div className="flex items-center gap-1.5">
                             <CheckCircle2 size={12} className="text-green-400" />
                             <span className="text-[10px] font-semibold text-green-400">
-                              {msg.actions!.length} {msg.actions!.length === 1 ? 'cambio aplicado' : 'cambios aplicados'}
+                              {msg.actions!.length === 1 ? t('chatAssistant.appliedChange', { n: msg.actions!.length }) : t('chatAssistant.appliedChanges', { n: msg.actions!.length })}
                             </span>
                           </div>
                           <div className="mt-1 text-[9px] text-green-400/60 font-mono">
@@ -1249,7 +1375,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                   );
                 })}
 
-                {isLoading && (
+                {isLoading && !messages.some(m => m.isGenerating) && (
                   <div className="flex justify-start">
                     <div className="bg-zinc-800 rounded-2xl rounded-bl-md px-4 py-3 border border-zinc-700/30">
                       <div className="flex items-center gap-2">
@@ -1273,6 +1399,19 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
 
                 <div ref={messagesEndRef} />
               </div>
+
+              {/* Scroll-to-bottom button */}
+              {showScrollBtn && (
+                <div className="absolute bottom-[140px] left-1/2 -translate-x-1/2 z-10">
+                  <button
+                    onClick={scrollToBottom}
+                    className="flex items-center gap-1.5 px-3 py-1.5 bg-purple-600/90 hover:bg-purple-500 text-white text-[11px] font-medium rounded-full shadow-lg backdrop-blur-sm transition-all duration-200 border border-purple-400/20"
+                  >
+                    <ArrowDown size={12} />
+                    {messages.some(m => m.isGenerating) ? t('chatAssistant.scrollWriting') : t('chatAssistant.scrollToBottom')}
+                  </button>
+                </div>
+              )}
 
               {/* Input */}
               <div className="flex-shrink-0 p-3 border-t border-zinc-700/50">
@@ -1363,26 +1502,52 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                   <h4 className="text-xs font-semibold text-cyan-400">{t('chatAssistant.codeTabTitle')}</h4>
                 </div>
                 
-                {audioCodes && audioCodes.trim() ? (
+                {generatedCodes && generatedCodes.length > 0 ? (
                   <>
                     <p className="text-[10px] text-zinc-500 mb-2">
-                      Estos son los tokens de audio code que se usan para la generación. Representan la codificación tokenizada del audio.
+                      {t('chatAssistant.codeTabDescription')}
                     </p>
-                    <div className="bg-zinc-950 rounded-xl border border-cyan-900/30 p-3 max-h-[350px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700">
-                      <pre className="text-[10px] text-cyan-300/80 font-mono whitespace-pre-wrap break-all leading-relaxed">
-                        {audioCodes}
-                      </pre>
-                    </div>
-                    <div className="flex items-center gap-2 mt-2">
-                      <span className="text-[10px] text-zinc-500">
-                        {audioCodes.split(/\s+/).length} tokens · {audioCodes.length} chars
-                      </span>
-                      <button
-                        onClick={() => navigator.clipboard.writeText(audioCodes)}
-                        className="text-[10px] text-cyan-400 hover:text-cyan-300 underline"
-                      >
-                        {t('chatAssistant.copyButton')}
-                      </button>
+                    <div className="space-y-1.5">
+                      {generatedCodes.map((entry) => {
+                        const isExpanded = expandedCodeId === entry.songId;
+                        return (
+                          <div key={entry.songId} className="rounded-xl border border-cyan-900/20 overflow-hidden">
+                            <button
+                              onClick={() => setExpandedCodeId(isExpanded ? null : entry.songId)}
+                              className="w-full flex items-center justify-between px-3 py-2 bg-zinc-900/60 hover:bg-zinc-800/60 transition-colors text-left"
+                            >
+                              <div className="flex items-center gap-2 min-w-0">
+                                <Code2 size={12} className="text-cyan-400 shrink-0" />
+                                <span className="text-[11px] text-zinc-200 truncate">{entry.title}</span>
+                              </div>
+                              <div className="flex items-center gap-2 shrink-0">
+                                <span className="text-[9px] text-zinc-500">{entry.codeCount} tokens</span>
+                                <ChevronDown size={12} className={`text-zinc-500 transition-transform ${isExpanded ? 'rotate-180' : ''}`} />
+                              </div>
+                            </button>
+                            {isExpanded && (
+                              <div className="border-t border-cyan-900/20">
+                                <div className="bg-zinc-950 p-3 max-h-[280px] overflow-y-auto scrollbar-thin scrollbar-thumb-zinc-700">
+                                  <pre className="text-[10px] text-cyan-300/80 font-mono whitespace-pre-wrap break-all leading-relaxed">
+                                    {entry.codes}
+                                  </pre>
+                                </div>
+                                <div className="flex items-center gap-2 px-3 py-1.5 bg-zinc-900/40">
+                                  <span className="text-[9px] text-zinc-500">
+                                    {entry.codeCount} tokens · {entry.codes.length} chars
+                                  </span>
+                                  <button
+                                    onClick={() => navigator.clipboard.writeText(entry.codes)}
+                                    className="text-[9px] text-cyan-400 hover:text-cyan-300 underline ml-auto"
+                                  >
+                                    {t('chatAssistant.copyButton')}
+                                  </button>
+                                </div>
+                              </div>
+                            )}
+                          </div>
+                        );
+                      })}
                     </div>
                   </>
                 ) : (
@@ -1390,9 +1555,7 @@ export function ChatAssistant({ onApplyParams, onGenerateWithParams, onSetLyrics
                     <Code2 size={32} className="mb-3 opacity-30" />
                     <p className="text-xs text-center">{t('chatAssistant.noCodesYet')}</p>
                     <p className="text-[10px] text-center mt-1 text-zinc-700">
-                      Los audio codes aparecerán aquí cuando actives<br />
-                      "Audio Codes" en los ajustes avanzados de generación<br />
-                      o cuando uses los modos cover/repaint.
+                      {t('chatAssistant.noCodesDetail')}
                     </p>
                   </div>
                 )}
