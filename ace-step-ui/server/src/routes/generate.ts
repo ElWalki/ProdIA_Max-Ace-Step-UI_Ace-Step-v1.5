@@ -951,6 +951,82 @@ router.get('/models/download/:modelName', async (req: AuthenticatedRequest, res:
   }
 });
 
+// GET /api/generate/checkpoints-path — Return the resolved checkpoints directory
+router.get('/checkpoints-path', async (_req, res: Response) => {
+  try {
+    const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const checkpointsDir = path.join(ACESTEP_DIR, 'checkpoints');
+    const { existsSync } = await import('fs');
+    res.json({
+      path: checkpointsDir,
+      acestepDir: ACESTEP_DIR,
+      exists: existsSync(checkpointsDir),
+    });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
+// POST /api/generate/models/download-main — Download the main model from HuggingFace
+router.post('/models/download-main', async (_req: AuthenticatedRequest, res: Response) => {
+  try {
+    const existing = activeDownloads.get('__main__');
+    if (existing && existing.status === 'downloading') {
+      res.json({ status: 'downloading', message: 'Already downloading main model', progress: existing.progress });
+      return;
+    }
+
+    const ACESTEP_DIR = process.env.ACESTEP_PATH || path.resolve(path.dirname(fileURLToPath(import.meta.url)), '../../../ACE-Step-1.5');
+    const pythonPath = resolvePythonPath(ACESTEP_DIR);
+    const downloaderScript = path.join(ACESTEP_DIR, 'acestep', 'model_downloader.py');
+
+    const { existsSync: fsExistsSync } = await import('fs');
+    if (!fsExistsSync(downloaderScript)) {
+      res.status(500).json({ error: 'model_downloader.py not found' });
+      return;
+    }
+
+    activeDownloads.set('__main__', { status: 'downloading', progress: 'Starting main model download...' });
+
+    const { spawn } = await import('child_process');
+    const proc = spawn(pythonPath, [downloaderScript, '--download-main'], {
+      cwd: ACESTEP_DIR,
+      env: { ...process.env, ACESTEP_PATH: ACESTEP_DIR, PYTHONUNBUFFERED: '1' },
+    });
+
+    let lastOutput = '';
+    proc.stdout.on('data', (data) => {
+      lastOutput = data.toString().trim();
+      activeDownloads.set('__main__', { status: 'downloading', progress: lastOutput });
+    });
+    proc.stderr.on('data', (data) => {
+      const line = data.toString().trim();
+      if (line) {
+        lastOutput = line;
+        activeDownloads.set('__main__', { status: 'downloading', progress: lastOutput });
+      }
+    });
+
+    proc.on('close', (code) => {
+      if (code === 0) {
+        activeDownloads.set('__main__', { status: 'done', progress: 'Main model download complete!' });
+      } else {
+        activeDownloads.set('__main__', { status: 'error', progress: lastOutput, error: `Download failed (exit code ${code})` });
+      }
+      setTimeout(() => activeDownloads.delete('__main__'), 5 * 60 * 1000);
+    });
+
+    proc.on('error', (err) => {
+      activeDownloads.set('__main__', { status: 'error', progress: '', error: err.message });
+      setTimeout(() => activeDownloads.delete('__main__'), 5 * 60 * 1000);
+    });
+
+    res.json({ status: 'downloading', message: 'Started downloading main model (ACE-Step/Ace-Step1.5)' });
+  } catch (error) {
+    res.status(500).json({ error: (error as Error).message });
+  }
+});
+
 // GET /api/generate/random-description — Load a random simple description from Gradio
 router.get('/random-description', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
   try {

@@ -87,6 +87,24 @@ export const generateApi = {
       '/api/generate/llm/swap', { method: 'POST', body: { model, backend }, token }
     ),
 
+  // Checkpoint management
+  getAllModels: () => api<{
+    models: { name: string; is_active: boolean; is_preloaded: boolean }[];
+  }>('/api/generate/models'),
+
+  getCheckpointsPath: () => api<{
+    path: string; acestepDir: string; exists: boolean;
+  }>('/api/generate/checkpoints-path'),
+
+  downloadModel: (modelName: string, token: string) =>
+    api<{ status: string; message: string }>('/api/generate/models/download', { method: 'POST', body: { modelName }, token }),
+
+  downloadMainModel: (token: string) =>
+    api<{ status: string; message: string }>('/api/generate/models/download-main', { method: 'POST', token }),
+
+  getDownloadProgress: (modelName: string) =>
+    api<{ status: string; progress: string; error?: string }>(`/api/generate/models/download/${encodeURIComponent(modelName)}`),
+
   // LoRA
   loadLora: (params: { lora_path: string }, token: string) =>
     api<{ message: string; lora_path: string; trigger_tag?: string }>('/api/lora/load', { method: 'POST', body: params, token }),

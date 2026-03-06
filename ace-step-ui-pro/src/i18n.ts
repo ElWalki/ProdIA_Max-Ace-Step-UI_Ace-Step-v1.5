@@ -394,6 +394,22 @@ const en = {
     repaintStart: 'Start position for audio repainting (0-1)',
     repaintEnd: 'End position for audio repainting (0-1)',
   },
+  checkpoints: {
+    title: 'Checkpoints',
+    unknown: 'Unknown path',
+    rescan: 'Rescan',
+    dirMissing: 'Checkpoints directory not found. Download the main model to create it.',
+    noCheckpoints: 'No official checkpoints found. Download from the official repository (ACE-Step/Ace-Step1.5).',
+    downloadMain: 'Download Main Model',
+    downloading: 'Downloading...',
+    starting: 'Starting...',
+    complete: 'Complete',
+    ditModels: 'DiT Models',
+    downloaded: 'downloaded',
+    onDisk: 'On disk',
+    download: 'Download',
+    downloadAll: 'Download all missing models',
+  },
 };
 
 const es: typeof en = {
@@ -787,6 +803,22 @@ const es: typeof en = {
     topP: 'Muestreo por núcleo — umbral de probabilidad',
     repaintStart: 'Posición inicio del repintado de audio (0-1)',
     repaintEnd: 'Posición fin del repintado de audio (0-1)',
+  },
+  checkpoints: {
+    title: 'Checkpoints',
+    unknown: 'Ruta desconocida',
+    rescan: 'Reescanear',
+    dirMissing: 'Directorio de checkpoints no encontrado. Descarga el modelo principal para crearlo.',
+    noCheckpoints: 'No se encontraron checkpoints oficiales. Descarga desde el repositorio oficial (ACE-Step/Ace-Step1.5).',
+    downloadMain: 'Descargar Modelo Principal',
+    downloading: 'Descargando...',
+    starting: 'Iniciando...',
+    complete: 'Completado',
+    ditModels: 'Modelos DiT',
+    downloaded: 'descargados',
+    onDisk: 'En disco',
+    download: 'Descargar',
+    downloadAll: 'Descargar todos los modelos faltantes',
   },
 };
 
