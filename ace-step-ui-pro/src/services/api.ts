@@ -176,3 +176,12 @@ export const vramApi = {
   reinitialize: (token: string) =>
     api<{ cancelledJobs: number; message: string }>('/api/generate/reinitialize', { method: 'POST', token }),
 };
+
+export const serverApi = {
+  health: () =>
+    api<{ status: string; uptime?: number }>('/health'),
+  shutdown: (token: string) =>
+    api<{ status: string; message: string }>('/api/server/shutdown', { method: 'POST', token }),
+  restart: (token: string) =>
+    api<{ status: string; message: string }>('/api/server/restart', { method: 'POST', token }),
+};

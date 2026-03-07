@@ -158,7 +158,7 @@ export interface ChordPreset {
   emoji: string;
 }
 
-export type View = 'create' | 'library' | 'training' | 'explore' | 'gpu' | 'studio';
+export type View = 'create' | 'library' | 'training' | 'explore' | 'gpu' | 'studio' | 'features';
 
 export const DEFAULT_PARAMS: GenerationParams = {
   customMode: false,

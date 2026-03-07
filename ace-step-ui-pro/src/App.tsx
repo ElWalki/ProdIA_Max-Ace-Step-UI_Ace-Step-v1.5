@@ -17,6 +17,7 @@ import SongDetailPanel from './components/ui/SongDetailPanel';
 import StemSeparator from './components/ui/StemSeparator';
 import GpuMonitorView from './components/views/GpuMonitorView';
 import StudioView from './components/views/StudioView';
+import FeaturesView from './components/views/FeaturesView';
 import SettingsModal from './components/ui/SettingsModal';
 import Toast from './components/ui/Toast';
 import LoginScreen from './components/ui/LoginScreen';
@@ -522,6 +523,8 @@ export default function App() {
         return <GpuMonitorView />;
       case 'studio':
         return <StudioView />;
+      case 'features':
+        return <FeaturesView />;
       default:
         return null;
     }

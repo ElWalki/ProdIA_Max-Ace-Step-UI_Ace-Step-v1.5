@@ -21,6 +21,7 @@ const NAV_ITEMS: { view: View; key: string }[] = [
   { view: 'training', key: 'nav.training' },
   { view: 'explore', key: 'nav.explore' },
   { view: 'gpu', key: 'nav.gpu' },
+  { view: 'features', key: 'nav.features' },
 ];
 
 export default function TopBar({ currentView, onNavigate, theme, onToggleTheme, onOpenSettings, assistantOpen, onToggleAssistant }: TopBarProps) {
