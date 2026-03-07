@@ -329,13 +329,18 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   };
 
   // LoRA handlers
-  const handleLoraLoad = useCallback(async (path: string, name: string, variant: string) => {
+  const handleLoraLoad = useCallback(async (path: string, name: string, variant: string, initialScale?: number) => {
     if (!token) return;
     try {
       const r = await generateApi.loadLora({ lora_path: path }, token);
+      // Load resets Python handler scale to 1.0 — re-apply desired scale
+      const desiredScale = initialScale ?? loraScale;
+      if (desiredScale !== 1.0) {
+        await generateApi.setLoraScale({ scale: desiredScale }, token).catch(() => {});
+      }
       setLoraLoaded(true);
       setLoraEnabled(true);
-      setLoraScale(1.0);
+      setLoraScale(desiredScale);
       setLoraPath(path);
       setSelectedLoraName(name);
       setLoraTriggerTag(r.trigger_tag ?? '');
@@ -343,10 +348,10 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
       set('loraName', name);
       set('loraLoaded', true);
       set('loraEnabled', true);
-      set('loraScale', 1.0);
+      set('loraScale', desiredScale);
       set('loraTriggerTag', r.trigger_tag ?? '');
     } catch { /* ignore */ }
-  }, [token, set]);
+  }, [token, set, loraScale]);
 
   const handleLoraUnload = useCallback(async () => {
     if (!token) return;

@@ -32,7 +32,7 @@ interface LoraManagerProps {
   loraTriggerTag: string;
   loraTagPosition: string;
   selectedLoraName: string;
-  onLoadLora: (path: string, name: string, variant: string) => void;
+  onLoadLora: (path: string, name: string, variant: string, initialScale?: number) => void;
   onUnloadLora: () => void;
   onSetScale: (scale: number) => void;
   onToggleEnabled: () => void;
@@ -111,11 +111,10 @@ export default function LoraManager({
 
   const handleConfirmLoad = useCallback(() => {
     if (!confirmLoad) return;
-    onSetScale(confirmScale);
-    generateApi.setLoraScale({ scale: confirmScale }, token).catch(() => {});
-    onLoadLora(confirmLoad.variant.path, confirmLoad.lora.name, confirmLoad.variant.label);
+    // Pass desired scale to load handler — it will apply it AFTER loading
+    onLoadLora(confirmLoad.variant.path, confirmLoad.lora.name, confirmLoad.variant.label, confirmScale);
     setConfirmLoad(null);
-  }, [confirmLoad, confirmScale, onLoadLora, onSetScale, token]);
+  }, [confirmLoad, confirmScale, onLoadLora]);
 
   const handleLoadFromPath = useCallback(() => {
     const p = customPath.trim();
@@ -196,15 +195,30 @@ export default function LoraManager({
             </div>
 
             {/* Scale */}
-            <div className="flex items-center gap-2">
-              <span className="text-[10px] text-surface-500 w-10">Scale</span>
-              <input
-                type="range" min={0} max={2} step={0.05}
-                value={loraScale}
-                onChange={e => handleScaleInput(parseFloat(e.target.value))}
-                className="flex-1 accent-accent-500 h-1"
-              />
-              <span className="text-[10px] text-surface-600 w-7 text-right font-mono">{loraScale.toFixed(2)}</span>
+            <div className="space-y-1">
+              <div className="flex items-center gap-2">
+                <span className="text-[10px] text-surface-500 w-10">Scale</span>
+                <div className="flex-1 relative">
+                  <input
+                    type="range" min={0} max={2} step={0.05}
+                    value={loraScale}
+                    onChange={e => handleScaleInput(parseFloat(e.target.value))}
+                    className="w-full accent-accent-500 h-1"
+                  />
+                  {/* Zone markers */}
+                  <div className="flex justify-between text-[8px] text-surface-400 -mt-0.5 px-0.5">
+                    <span>0</span>
+                    <span className="text-green-400">1.0</span>
+                    <span className={loraScale > 1.5 ? 'text-red-400' : 'text-surface-400'}>2.0</span>
+                  </div>
+                </div>
+                <span className={`text-[10px] w-7 text-right font-mono shrink-0 ${
+                  loraScale > 1.5 ? 'text-red-400' : loraScale > 1.0 ? 'text-amber-400' : 'text-surface-600'
+                }`}>{loraScale.toFixed(2)}</span>
+              </div>
+              {loraScale > 1.5 && (
+                <p className="text-[9px] text-amber-400/80 ml-10">⚠ High scale may cause audio artifacts</p>
+              )}
             </div>
 
             {/* Trigger tag & position */}
@@ -399,7 +413,9 @@ export default function LoraManager({
             <div className="space-y-1">
               <div className="flex items-center justify-between">
                 <span className="text-[10px] text-surface-500">{t('lora.scale', 'Scale / Influence')}</span>
-                <span className="text-[10px] text-surface-600 font-mono">{confirmScale.toFixed(2)}</span>
+                <span className={`text-[10px] font-mono ${
+                  confirmScale > 1.5 ? 'text-red-400' : confirmScale > 1.0 ? 'text-amber-400' : 'text-surface-600'
+                }`}>{confirmScale.toFixed(2)}</span>
               </div>
               <input
                 type="range" min={0} max={2} step={0.05}
@@ -408,8 +424,11 @@ export default function LoraManager({
                 className="w-full accent-accent-500 h-1"
               />
               <div className="flex justify-between text-[9px] text-surface-400">
-                <span>0.00</span><span>1.00</span><span>2.00</span>
+                <span>0.00</span><span className="text-green-400">1.00</span><span className={confirmScale > 1.5 ? 'text-red-400' : ''}>2.00</span>
               </div>
+              {confirmScale > 1.5 && (
+                <p className="text-[9px] text-amber-400/80">⚠ Values above 1.5 may cause audio artifacts (buzzing)</p>
+              )}
             </div>
 
             <div className="flex items-center gap-2 pt-1">
