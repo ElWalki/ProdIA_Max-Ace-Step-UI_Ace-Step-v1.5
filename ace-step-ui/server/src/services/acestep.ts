@@ -174,8 +174,8 @@ async function buildGradioArgs(params: GenerationParams): Promise<unknown[]> {
   const isThinking = params.thinking ?? false;
   const isEnhance = params.enhance ?? false;
 
-  // Inject LoRA trigger tag into the prompt if configured
-  if (params.loraTriggerTag && params.loraTagPosition && params.loraTagPosition !== 'off') {
+  // Inject LoRA trigger tag into the prompt if configured AND LoRA is enabled
+  if (params.loraEnabled !== false && params.loraTriggerTag && params.loraTagPosition && params.loraTagPosition !== 'off') {
     const tag = params.loraTriggerTag.trim();
     if (tag) {
       if (params.loraTagPosition === 'prepend') {
@@ -464,6 +464,14 @@ export async function getBackendStatus(): Promise<BackendStatus> {
   // Unwrap { code, data } envelope used by api_routes.py
   const data = json.data ?? json;
   return data as BackendStatus;
+}
+
+// Queue statistics from Python API /v1/stats
+export async function getQueueStats() {
+  const resp = await fetch(`${ACESTEP_API}/v1/stats`);
+  if (!resp.ok) throw new Error(`Queue stats failed: ${resp.status}`);
+  const json = await resp.json();
+  return json.data ?? json;
 }
 
 // Swap LLM model — unloads current, loads new one (blocking ~30-90s)

@@ -25,6 +25,7 @@ import {
   getJobRawResponse,
   downloadAudioToBuffer,
   resolvePythonPath,
+  getQueueStats,
 } from '../services/acestep.js';
 import { tagAudioBuffer } from '../services/audioMetadata.js';
 import { getStorageProvider } from '../services/storage/factory.js';
@@ -1120,6 +1121,16 @@ router.get('/backend-status', async (_req, res: Response) => {
   try {
     const status = await getBackendStatus();
     res.json(status);
+  } catch (error) {
+    res.status(502).json({ error: (error as Error).message });
+  }
+});
+
+// Queue statistics from Python API /v1/stats
+router.get('/stats', async (_req, res: Response) => {
+  try {
+    const stats = await getQueueStats();
+    res.json(stats);
   } catch (error) {
     res.status(502).json({ error: (error as Error).message });
   }

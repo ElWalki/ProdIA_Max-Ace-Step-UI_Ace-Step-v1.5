@@ -1,10 +1,11 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
-  Server, Activity, Cpu, Zap, HardDrive, RefreshCw, Settings2,
+  Server, Activity, Cpu, Zap, RefreshCw, Settings2,
   Power, RotateCcw, FolderOpen, ChevronDown, ChevronRight,
   CheckCircle2, XCircle, AlertTriangle, Loader2, Shield,
   Gauge, MemoryStick, Wrench, FlaskConical, Search,
+  BarChart3, Clock, ListOrdered,
 } from 'lucide-react';
 import { generateApi, vramApi, serverApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -13,6 +14,13 @@ import { useAuth } from '../../context/AuthContext';
 interface BackendStatus {
   dit: { loaded: boolean; model: string | null; is_turbo: boolean };
   llm: { loaded: boolean; model: string | null; backend: string | null };
+}
+
+interface QueueStats {
+  jobs: { total: number; queued: number; running: number; succeeded: number; failed: number };
+  queue_size: number;
+  queue_maxsize: number;
+  avg_job_seconds: number;
 }
 
 interface ExperimentalConfig {
@@ -122,6 +130,13 @@ export default function FeaturesView() {
   const [serverOnline, setServerOnline] = useState<boolean | null>(null);
   const [statusLoading, setStatusLoading] = useState(true);
 
+  // ─── Queue Stats ────────────────────
+  const [queueStats, setQueueStats] = useState<QueueStats | null>(null);
+
+  // ─── LLM Swap ──────────────────────
+  const [llmSwapBackend, setLlmSwapBackend] = useState<string>('pt');
+  const [llmSwapping, setLlmSwapping] = useState(false);
+
   // ─── Checkpoints ────────────────────
   const [checkpointsPath, setCheckpointsPath] = useState<string>('');
   const [checkpointsExists, setCheckpointsExists] = useState(true);
@@ -157,10 +172,20 @@ export default function FeaturesView() {
       ]);
       setBackendStatus(bs.status === 'fulfilled' ? bs.value : null);
       setServerOnline(health.status === 'fulfilled');
+      if (bs.status === 'fulfilled' && bs.value.llm.backend) {
+        setLlmSwapBackend(bs.value.llm.backend);
+      }
     } catch {
       setServerOnline(false);
     }
     setStatusLoading(false);
+  }, []);
+
+  const fetchQueueStats = useCallback(async () => {
+    try {
+      const r = await fetch('/api/generate/stats');
+      if (r.ok) setQueueStats(await r.json());
+    } catch { /* Python API may be down */ }
   }, []);
 
   const fetchCheckpointsPath = useCallback(async () => {
@@ -174,8 +199,9 @@ export default function FeaturesView() {
 
   useEffect(() => {
     fetchStatus();
+    fetchQueueStats();
     fetchCheckpointsPath();
-  }, [fetchStatus, fetchCheckpointsPath]);
+  }, [fetchStatus, fetchQueueStats, fetchCheckpointsPath]);
 
   // ─── Config Updaters ───────────────
   const updateExperimental = (key: keyof ExperimentalConfig, value: boolean) => {
@@ -188,6 +214,20 @@ export default function FeaturesView() {
     const next = { ...modelInit, [key]: value };
     setModelInit(next);
     saveConfig('acestep_model_init', next);
+  };
+
+  // ─── LLM Swap ─────────────────────
+  const swapLlmBackend = async () => {
+    if (!token || !backendStatus?.llm.model) return;
+    setLlmSwapping(true);
+    try {
+      await generateApi.swapLlmModel(backendStatus.llm.model, llmSwapBackend, token);
+      setActionResult({ type: 'success', msg: `LLM backend → ${llmSwapBackend}` });
+      fetchStatus();
+    } catch (e: any) {
+      setActionResult({ type: 'error', msg: e.message });
+    }
+    setLlmSwapping(false);
   };
 
   // ─── VRAM Diagnostic ───────────────
@@ -299,9 +339,9 @@ export default function FeaturesView() {
             <p className="text-xs text-surface-500 mt-1">{t('features.subtitle')}</p>
           </div>
           <button
-            onClick={fetchStatus}
+            onClick={() => { fetchStatus(); fetchQueueStats(); }}
             disabled={statusLoading}
-            className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-surface-100 hover:bg-surface-200 text-surface-600 text-xs transition-colors"
+            className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-surface-800 text-surface-100 text-xs font-medium hover:bg-surface-700 active:bg-surface-600 transition-colors disabled:opacity-60"
           >
             <RefreshCw className={`w-3.5 h-3.5 ${statusLoading ? 'animate-spin' : ''}`} />
             {t('common.refresh')}
@@ -363,9 +403,74 @@ export default function FeaturesView() {
               <StatusDot status={statusLoading ? 'loading' : backendStatus?.llm.loaded ? 'online' : 'offline'} />
             </div>
           </div>
+
+          {/* LLM Backend Switcher */}
+          {backendStatus?.llm.loaded && (
+            <div className="flex items-center gap-3 mt-3 px-4 py-3 rounded-lg bg-surface-100/60 border border-surface-200/40">
+              <div className="flex-1">
+                <div className="text-sm font-medium text-surface-800">{t('features.llmBackend')}</div>
+                <div className="text-xs text-surface-500">{t('features.llmBackendDesc')}</div>
+              </div>
+              <select
+                value={llmSwapBackend}
+                onChange={e => setLlmSwapBackend(e.target.value)}
+                className="bg-surface-200/60 text-sm text-surface-800 rounded-lg px-3 py-1.5 border border-surface-300/40 outline-none focus:ring-1 focus:ring-accent-500/50"
+              >
+                <option value="pt">PyTorch</option>
+                <option value="vllm">vLLM</option>
+              </select>
+              <button
+                onClick={swapLlmBackend}
+                disabled={llmSwapping || llmSwapBackend === backendStatus.llm.backend}
+                className="px-3.5 py-1.5 rounded-lg bg-surface-800 text-surface-100 text-xs font-medium hover:bg-surface-700 active:bg-surface-600 transition-colors disabled:opacity-40 disabled:cursor-not-allowed"
+              >
+                {llmSwapping ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : t('features.apply')}
+              </button>
+            </div>
+          )}
         </Section>
 
-        {/* ──────────────── 2. EXPERIMENTAL GENERATION ──────────────── */}
+        {/* ──────────────── 2. QUEUE STATISTICS ──────────────── */}
+        <Section title={t('features.queueStats')} icon={BarChart3} defaultOpen={false}>
+          {queueStats ? (
+            <div className="space-y-3">
+              <div className="grid grid-cols-2 sm:grid-cols-4 gap-3">
+                <div className="px-4 py-3 rounded-lg bg-surface-100/60 border border-surface-200/40 text-center">
+                  <div className="text-lg font-bold text-surface-800">{queueStats.jobs.total}</div>
+                  <div className="text-[11px] text-surface-500">{t('features.totalJobs')}</div>
+                </div>
+                <div className="px-4 py-3 rounded-lg bg-surface-100/60 border border-surface-200/40 text-center">
+                  <div className="text-lg font-bold text-yellow-400">{queueStats.jobs.queued + queueStats.jobs.running}</div>
+                  <div className="text-[11px] text-surface-500">{t('features.activeJobs')}</div>
+                </div>
+                <div className="px-4 py-3 rounded-lg bg-surface-100/60 border border-surface-200/40 text-center">
+                  <div className="text-lg font-bold text-emerald-400">{queueStats.jobs.succeeded}</div>
+                  <div className="text-[11px] text-surface-500">{t('features.succeededJobs')}</div>
+                </div>
+                <div className="px-4 py-3 rounded-lg bg-surface-100/60 border border-surface-200/40 text-center">
+                  <div className="text-lg font-bold text-red-400">{queueStats.jobs.failed}</div>
+                  <div className="text-[11px] text-surface-500">{t('features.failedJobs')}</div>
+                </div>
+              </div>
+              <div className="flex items-center gap-4 px-4 py-2.5 rounded-lg bg-surface-100/60 border border-surface-200/40">
+                <div className="flex items-center gap-2">
+                  <ListOrdered className="w-3.5 h-3.5 text-surface-500" />
+                  <span className="text-xs text-surface-500">{t('features.queueCapacity')}</span>
+                  <span className="text-sm font-medium text-surface-800">{queueStats.queue_size} / {queueStats.queue_maxsize}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  <Clock className="w-3.5 h-3.5 text-surface-500" />
+                  <span className="text-xs text-surface-500">{t('features.avgTime')}</span>
+                  <span className="text-sm font-medium text-surface-800">{queueStats.avg_job_seconds.toFixed(1)}s</span>
+                </div>
+              </div>
+            </div>
+          ) : (
+            <div className="text-xs text-surface-500 px-4 py-3">{t('features.queueOffline')}</div>
+          )}
+        </Section>
+
+        {/* ──────────────── 3. EXPERIMENTAL GENERATION ──────────────── */}
         <Section title={t('features.experimentalParams')} icon={FlaskConical}>
           <p className="text-xs text-surface-500 mb-3">{t('features.experimentalDesc')}</p>
           <div className="space-y-2.5">
@@ -407,7 +512,7 @@ export default function FeaturesView() {
           </div>
         </Section>
 
-        {/* ──────────────── 3. MODEL CONFIGURATION ──────────────── */}
+        {/* ──────────────── 4. MODEL CONFIGURATION ──────────────── */}
         <Section title={t('features.modelConfig')} icon={Gauge}>
           <p className="text-xs text-surface-500 mb-3">{t('features.modelConfigDesc')}</p>
           <div className="space-y-2.5">
@@ -486,7 +591,7 @@ export default function FeaturesView() {
           </div>
         </Section>
 
-        {/* ──────────────── 4. CHECKPOINTS PATH ──────────────── */}
+        {/* ──────────────── 5. CHECKPOINTS PATH ──────────────── */}
         <Section title={t('features.checkpointsManagement')} icon={FolderOpen}>
           <div className="px-4 py-3 rounded-lg bg-surface-100/60 border border-surface-200/40">
             <div className="flex items-center justify-between mb-2">
@@ -516,10 +621,10 @@ export default function FeaturesView() {
                   placeholder={t('checkpoints.pathLabel')}
                   className="flex-1 text-sm bg-surface-200/60 text-surface-800 rounded-lg px-3 py-1.5 border border-surface-300/40 outline-none focus:ring-1 focus:ring-accent-500/50"
                 />
-                <button onClick={savePath} className="px-3 py-1.5 text-xs rounded-lg bg-accent-500 text-white hover:bg-accent-600 transition-colors">
+                <button onClick={savePath} className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-accent-500 text-white hover:bg-accent-600 active:bg-accent-700 transition-colors">
                   {t('common.save')}
                 </button>
-                <button onClick={() => setEditingPath(false)} className="px-3 py-1.5 text-xs rounded-lg bg-surface-200 text-surface-600 hover:bg-surface-300 transition-colors">
+                <button onClick={() => setEditingPath(false)} className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-surface-800 text-surface-100 hover:bg-surface-700 active:bg-surface-600 transition-colors">
                   {t('common.cancel')}
                 </button>
               </div>
@@ -527,12 +632,12 @@ export default function FeaturesView() {
               <div className="flex items-center gap-2 mt-3">
                 <button
                   onClick={() => { setNewPath(checkpointsPath); setEditingPath(true); }}
-                  className="px-3 py-1.5 text-xs rounded-lg bg-surface-200 text-surface-600 hover:bg-surface-300 transition-colors"
+                  className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-surface-800 text-surface-100 hover:bg-surface-700 active:bg-surface-600 transition-colors"
                 >
                   {t('checkpoints.changePath')}
                 </button>
                 {isCustomPath && (
-                  <button onClick={resetPath} className="px-3 py-1.5 text-xs rounded-lg bg-surface-200 text-surface-600 hover:bg-surface-300 transition-colors">
+                  <button onClick={resetPath} className="px-3.5 py-1.5 text-xs font-medium rounded-lg bg-surface-800 text-surface-100 hover:bg-surface-700 active:bg-surface-600 transition-colors">
                     {t('checkpoints.resetPath')}
                   </button>
                 )}
@@ -541,13 +646,13 @@ export default function FeaturesView() {
           </div>
         </Section>
 
-        {/* ──────────────── 5. VRAM DIAGNOSTICS ──────────────── */}
+        {/* ──────────────── 6. VRAM DIAGNOSTICS ──────────────── */}
         <Section title={t('features.vramDiagnostics')} icon={MemoryStick} defaultOpen={false}>
           <div className="flex items-center gap-2 mb-3">
             <button
               onClick={runDiagnostic}
               disabled={diagLoading}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-accent-500/10 text-accent-400 border border-accent-500/20 text-xs hover:bg-accent-500/20 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-surface-800 text-surface-100 text-xs font-medium hover:bg-surface-700 active:bg-surface-600 transition-colors disabled:opacity-50"
             >
               {diagLoading ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Search className="w-3.5 h-3.5" />}
               {t('features.runDiagnostic')}
@@ -555,7 +660,7 @@ export default function FeaturesView() {
             <button
               onClick={forceCleanup}
               disabled={actionLoading === 'cleanup'}
-              className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg bg-orange-500/10 text-orange-400 border border-orange-500/20 text-xs hover:bg-orange-500/20 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-3.5 py-2 rounded-lg bg-surface-800 text-orange-400 text-xs font-medium hover:bg-surface-700 active:bg-surface-600 transition-colors disabled:opacity-50"
             >
               {actionLoading === 'cleanup' ? <Loader2 className="w-3.5 h-3.5 animate-spin" /> : <Wrench className="w-3.5 h-3.5" />}
               {t('vram.forceCleanup')}
@@ -566,7 +671,7 @@ export default function FeaturesView() {
             <div className="rounded-lg bg-surface-200/40 border border-surface-300/30 overflow-hidden">
               <div className="px-4 py-2 border-b border-surface-300/30 flex items-center justify-between">
                 <span className="text-xs font-medium text-surface-600">{t('features.diagnosticResults')}</span>
-                <button onClick={() => setDiagnostic(null)} className="text-xs text-surface-500 hover:text-surface-700">
+                <button onClick={() => setDiagnostic(null)} className="text-xs text-surface-500 hover:text-surface-800 transition-colors">
                   {t('common.close')}
                 </button>
               </div>
@@ -577,7 +682,7 @@ export default function FeaturesView() {
           )}
         </Section>
 
-        {/* ──────────────── 6. SERVER CONTROL ──────────────── */}
+        {/* ──────────────── 7. SERVER CONTROL ──────────────── */}
         <Section title={t('features.serverControl')} icon={Shield} defaultOpen={false}>
           <p className="text-xs text-surface-500 mb-3">{t('features.serverControlDesc')}</p>
           <div className="flex flex-wrap items-center gap-2">
@@ -585,7 +690,7 @@ export default function FeaturesView() {
             <button
               onClick={reinitialize}
               disabled={!!actionLoading}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-yellow-500/10 text-yellow-400 border border-yellow-500/20 text-sm hover:bg-yellow-500/20 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-800 text-yellow-400 text-sm font-medium hover:bg-surface-700 active:bg-surface-600 transition-colors disabled:opacity-50"
             >
               {actionLoading === 'reinit' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RotateCcw className="w-4 h-4" />}
               {t('vram.reinitialize')}
@@ -593,12 +698,12 @@ export default function FeaturesView() {
             <span className="text-[10px] text-surface-500">{t('vram.reinitWarn')}</span>
           </div>
 
-          <div className="flex flex-wrap items-center gap-2 mt-2 pt-3 border-t border-surface-200/40">
+          <div className="flex flex-wrap items-center gap-2 mt-3 pt-3 border-t border-surface-200/40">
             {/* Restart */}
             <button
               onClick={restartServer}
               disabled={!!actionLoading}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-blue-500/10 text-blue-400 border border-blue-500/20 text-sm hover:bg-blue-500/20 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-800 text-blue-400 text-sm font-medium hover:bg-surface-700 active:bg-surface-600 transition-colors disabled:opacity-50"
             >
               {actionLoading === 'restart' ? <Loader2 className="w-4 h-4 animate-spin" /> : <RefreshCw className="w-4 h-4" />}
               {t('features.restartServer')}
@@ -608,7 +713,7 @@ export default function FeaturesView() {
             <button
               onClick={shutdownServer}
               disabled={!!actionLoading}
-              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-red-500/10 text-red-400 border border-red-500/20 text-sm hover:bg-red-500/20 transition-colors disabled:opacity-50"
+              className="flex items-center gap-1.5 px-4 py-2 rounded-lg bg-surface-800 text-red-400 text-sm font-medium hover:bg-surface-700 active:bg-surface-600 transition-colors disabled:opacity-50"
             >
               {actionLoading === 'shutdown' ? <Loader2 className="w-4 h-4 animate-spin" /> : <Power className="w-4 h-4" />}
               {t('features.shutdownServer')}
