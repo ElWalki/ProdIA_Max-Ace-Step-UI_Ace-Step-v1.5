@@ -73,9 +73,11 @@ export const generateApi = {
     llm: { loaded: boolean; model: string | null; backend: string | null };
   }>('/api/generate/backend-status'),
   getLoadedModels: () => api<{
-    models: { name: string; is_default: boolean }[];
-    default_model: string | null;
-  }>('/v1/models').catch(() => ({ models: [], default_model: null })),
+    models: { name: string; is_active: boolean; is_preloaded: boolean }[];
+  }>('/api/generate/models').then(r => ({
+    models: r.models.map(m => ({ name: m.name, is_default: m.is_active })),
+    default_model: r.models.find(m => m.is_active)?.name || null,
+  })).catch(() => ({ models: [], default_model: null })),
   formatInput: (params: Record<string, unknown>, token: string) =>
     api<Record<string, unknown>>('/api/generate/format', { method: 'POST', body: params, token }),
   getRandomDescription: (token: string) =>
@@ -123,9 +125,9 @@ export const generateApi = {
   setLoraScale: (params: { scale: number }, token: string) =>
     api<{ message: string; scale: number }>('/api/lora/scale', { method: 'POST', body: params, token }),
   toggleLora: (params: { enabled: boolean }, token: string) =>
-    api<{ message: string; enabled: boolean }>('/api/lora/toggle', { method: 'POST', body: params, token }),
+    api<{ message: string; active: boolean }>('/api/lora/toggle', { method: 'POST', body: params, token }),
   setLoraTagPosition: (params: { position: string }, token: string) =>
-    api<{ message: string }>('/api/lora/tag-position', { method: 'POST', body: params, token }),
+    api<{ message: string }>('/api/lora/tag-position', { method: 'POST', body: { tag_position: params.position }, token }),
   listLoras: (token: string, directories?: string[]) =>
     api<{ loras: any[]; defaultDirectory: string }>('/api/lora/list', { method: 'POST', body: { directories }, token }),
   validateLoraDir: (dir: string, token: string) =>
