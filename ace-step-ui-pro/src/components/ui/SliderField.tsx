@@ -73,7 +73,7 @@ export default function SliderField({ label, value, onChange, min, max, step = 1
       ) : (
         <span
           onDoubleClick={handleDoubleClick}
-          className="w-16 text-xs text-right text-surface-700 cursor-pointer tabular-nums"
+          className="w-16 text-xs text-right text-surface-700 cursor-pointer tabular-nums shrink-0"
           title="Double-click to edit"
         >
           {step < 1 ? value.toFixed(2) : value}{suffix || ''}
