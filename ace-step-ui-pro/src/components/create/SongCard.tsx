@@ -39,9 +39,19 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
     onMenuAction?.(key);
   }, [onPlay, onDelete, onMenuAction]);
 
+  const handleDragStart = useCallback((e: React.DragEvent) => {
+    if (song.isGenerating || !song.audioUrl) { e.preventDefault(); return; }
+    e.dataTransfer.setData('text/song-audio-url', song.audioUrl);
+    e.dataTransfer.setData('text/song-title', song.title || 'Untitled');
+    e.dataTransfer.setData('text/song-id', song.id);
+    e.dataTransfer.effectAllowed = 'copy';
+  }, [song]);
+
   return (
     <>
       <div
+        draggable={!song.isGenerating && !!song.audioUrl}
+        onDragStart={handleDragStart}
         className={`group flex items-center gap-3 px-3 py-2 rounded-lg cursor-pointer transition-colors ${
           isCurrent
             ? 'bg-accent-500/10 border border-accent-500/30'

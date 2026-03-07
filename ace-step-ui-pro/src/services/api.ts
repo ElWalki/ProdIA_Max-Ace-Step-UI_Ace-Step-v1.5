@@ -165,4 +165,10 @@ export const vramApi = {
     api<VramStatus>('/api/vram/status', { token }),
   purge: (token: string) =>
     api<{ success: boolean; message?: string }>('/api/vram/purge', { method: 'POST', token }),
+  forceCleanup: (token: string) =>
+    api<{ success: boolean; actions: string[] }>('/api/generate/vram/force-cleanup', { method: 'POST', token }),
+  diagnostic: (token: string) =>
+    api<Record<string, unknown>>('/api/generate/vram/diagnostic', { token }),
+  reinitialize: (token: string) =>
+    api<{ cancelledJobs: number; message: string }>('/api/generate/reinitialize', { method: 'POST', token }),
 };

@@ -10,6 +10,7 @@ interface AudioSectionProps {
   onUpload: (file: File) => void;
   onClear: () => void;
   onRecord?: () => void;
+  onSongDrop?: (url: string, title: string) => void;
   strength?: number;
   onStrengthChange?: (v: number) => void;
   accept?: string;
@@ -17,7 +18,7 @@ interface AudioSectionProps {
 
 function AudioSection({
   label, description, audioUrl, audioTitle,
-  onUpload, onClear, onRecord, strength, onStrengthChange, accept = 'audio/*',
+  onUpload, onClear, onRecord, onSongDrop, strength, onStrengthChange, accept = 'audio/*',
 }: AudioSectionProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
@@ -25,9 +26,17 @@ function AudioSection({
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     setIsDragging(false);
+    // Check for song drag from workspace first
+    const songUrl = e.dataTransfer.getData('text/song-audio-url');
+    const songTitle = e.dataTransfer.getData('text/song-title');
+    if (songUrl && onSongDrop) {
+      onSongDrop(songUrl, songTitle || 'Untitled');
+      return;
+    }
+    // Fallback: file drop
     const file = e.dataTransfer.files[0];
     if (file?.type.startsWith('audio/')) onUpload(file);
-  }, [onUpload]);
+  }, [onUpload, onSongDrop]);
 
   return (
     <div className="space-y-1.5">
@@ -93,6 +102,7 @@ interface AudioSectionsProps {
   referenceAudioTitle?: string;
   onReferenceUpload: (file: File) => void;
   onReferenceClear: () => void;
+  onReferenceSongDrop?: (url: string, title: string) => void;
   referenceStrength?: number;
   onReferenceStrengthChange?: (v: number) => void;
 
@@ -100,6 +110,7 @@ interface AudioSectionsProps {
   coverAudioTitle?: string;
   onCoverUpload: (file: File) => void;
   onCoverClear: () => void;
+  onCoverSongDrop?: (url: string, title: string) => void;
   coverStrength?: number;
   onCoverStrengthChange?: (v: number) => void;
 
@@ -107,6 +118,7 @@ interface AudioSectionsProps {
   vocalAudioTitle?: string;
   onVocalUpload: (file: File) => void;
   onVocalClear: () => void;
+  onVocalSongDrop?: (url: string, title: string) => void;
   vocalStrength?: number;
   onVocalStrengthChange?: (v: number) => void;
 
@@ -150,11 +162,12 @@ export default function AudioSections(props: AudioSectionsProps) {
         {activeTab === 'reference' && (
           <AudioSection
             label={t('audio.referenceLabel', 'Reference Audio')}
-            description={t('audio.referenceDrop', 'Drop reference audio or click to upload')}
+            description={t('audio.referenceDrop', 'Drop reference audio or drag a song from workspace')}
             audioUrl={props.referenceAudioUrl}
             audioTitle={props.referenceAudioTitle}
             onUpload={props.onReferenceUpload}
             onClear={props.onReferenceClear}
+            onSongDrop={props.onReferenceSongDrop}
             strength={props.referenceStrength}
             onStrengthChange={props.onReferenceStrengthChange}
           />
@@ -162,11 +175,12 @@ export default function AudioSections(props: AudioSectionsProps) {
         {activeTab === 'cover' && (
           <AudioSection
             label={t('audio.coverLabel', 'Cover Audio')}
-            description={t('audio.coverDrop', 'Drop cover audio or click to upload')}
+            description={t('audio.coverDrop', 'Drop cover audio or drag a song from workspace')}
             audioUrl={props.coverAudioUrl}
             audioTitle={props.coverAudioTitle}
             onUpload={props.onCoverUpload}
             onClear={props.onCoverClear}
+            onSongDrop={props.onCoverSongDrop}
             strength={props.coverStrength}
             onStrengthChange={props.onCoverStrengthChange}
           />
@@ -174,11 +188,12 @@ export default function AudioSections(props: AudioSectionsProps) {
         {activeTab === 'vocal' && (
           <AudioSection
             label={t('audio.vocalLabel', 'Vocal Audio')}
-            description={t('audio.vocalDrop', 'Drop vocal audio or click to upload')}
+            description={t('audio.vocalDrop', 'Drop vocal audio or drag a song from workspace')}
             audioUrl={props.vocalAudioUrl}
             audioTitle={props.vocalAudioTitle}
             onUpload={props.onVocalUpload}
             onClear={props.onVocalClear}
+            onSongDrop={props.onVocalSongDrop}
             strength={props.vocalStrength}
             onStrengthChange={props.onVocalStrengthChange}
             onRecord={props.onRecord}

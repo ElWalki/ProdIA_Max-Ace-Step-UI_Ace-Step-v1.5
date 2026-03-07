@@ -28,6 +28,7 @@ export interface FloatingAssistantProps {
 
 const STORAGE_KEY = 'acestep_assistant_pos';
 const HISTORY_KEY = 'acestep_chat_history';
+const KEEP_ALIVE_KEY = 'acestep_assistant_keep_alive';
 const DEFAULT_POS = { x: window.innerWidth - 420, y: 80 };
 
 function loadPos() {
@@ -264,6 +265,7 @@ async function callAiApiStream(
   provider: AiProvider,
   messages: { role: string; content: string }[],
   onChunk: (text: string) => void,
+  keepAlive?: boolean,
 ): Promise<void> {
   if (provider.id === 'ollama') {
     const res = await fetch(`${provider.baseUrl}/api/chat`, {
@@ -273,6 +275,7 @@ async function callAiApiStream(
         model: provider.selectedModel || 'llama3',
         messages: messages.map(m => ({ role: m.role, content: m.content })),
         stream: true,
+        ...(keepAlive !== undefined ? { keep_alive: keepAlive ? -1 : '5m' } : {}),
       }),
     });
     if (!res.ok) throw new Error(`Ollama: HTTP ${res.status}`);
@@ -433,6 +436,9 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
   const [input, setInput] = useState('');
   const [loading, setLoading] = useState(false);
   const [copiedIdx, setCopiedIdx] = useState<number | null>(null);
+  const [keepAlive, setKeepAlive] = useState(() => {
+    return localStorage.getItem(KEEP_ALIVE_KEY) !== 'false'; // default true
+  });
 
   // Drag state
   const [pos, setPos] = useState(loadPos);
@@ -445,6 +451,11 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(pos));
   }, [pos]);
+
+  // Persist keep-alive preference
+  useEffect(() => {
+    localStorage.setItem(KEEP_ALIVE_KEY, String(keepAlive));
+  }, [keepAlive]);
 
   // Persist chat history
   useEffect(() => {
@@ -578,7 +589,7 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
             }
             return updated;
           });
-        });
+        }, keepAlive);
 
         // Mark streaming complete
         setMessages(prev => {
@@ -690,6 +701,15 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
           className="p-1.5 rounded-lg text-[#666] hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
           title={t('assistant.clearHistory')}>
           <RotateCcw className="w-3.5 h-3.5" />
+        </button>
+        <button
+          onClick={() => setKeepAlive(v => !v)}
+          className={`p-1.5 rounded-lg transition-colors ${
+            keepAlive ? 'text-green-400 bg-green-500/15 hover:bg-green-500/25' : 'text-[#666] hover:text-[#999] hover:bg-[#333]'
+          }`}
+          title={t('vram.keepInMemory')}
+        >
+          <Brain className="w-3.5 h-3.5" />
         </button>
         <button onClick={() => setMinimized(true)}
           className="p-1.5 rounded-lg text-[#666] hover:text-white hover:bg-[#333] transition-colors">

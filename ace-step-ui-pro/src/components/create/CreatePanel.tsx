@@ -96,6 +96,22 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   const [availableModels, setAvailableModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [modelLoading, setModelLoading] = useState(false);
+  const modelMenuRef = useRef<HTMLDivElement>(null);
+  const templateMenuRef = useRef<HTMLDivElement>(null);
+
+  // Close dropdowns on outside click
+  useEffect(() => {
+    const handler = (e: MouseEvent) => {
+      if (showModelMenu && modelMenuRef.current && !modelMenuRef.current.contains(e.target as Node)) {
+        setShowModelMenu(false);
+      }
+      if (showTemplateMenu && templateMenuRef.current && !templateMenuRef.current.contains(e.target as Node)) {
+        setShowTemplateMenu(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showModelMenu, showTemplateMenu]);
 
   const set = useCallback(<K extends keyof GenerationParams>(key: K, val: GenerationParams[K]) => {
     setParams(p => ({ ...p, [key]: val }));
@@ -134,6 +150,8 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
     setModelLoading(true);
     try {
       await generateApi.loadModel(modelName, token || '');
+      // Purge leftover VRAM from the previous model
+      await fetch('/api/vram/purge', { method: 'POST' }).catch(() => {});
       refreshModels();
     } catch {
       // Model swap failed — still selected in UI
@@ -446,7 +464,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
         {/* Model switcher + Templates bar */}
         <div className="flex items-center gap-1.5 mb-1">
           {/* DiT Model selector */}
-          <div className="relative">
+          <div className="relative" ref={modelMenuRef}>
             <button
               onClick={() => setShowModelMenu(!showModelMenu)}
               disabled={modelLoading}
@@ -511,7 +529,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
           </div>
           <div className="flex-1" />
           {/* Template save/load */}
-          <div className="relative">
+          <div className="relative" ref={templateMenuRef}>
             <button
               onClick={() => setShowTemplateMenu(!showTemplateMenu)}
               className="flex items-center gap-1 px-2 py-1 rounded-md text-xs text-surface-400 hover:text-accent-400 hover:bg-surface-200 transition-colors"
@@ -679,14 +697,17 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                 referenceAudioTitle={params.referenceAudioTitle}
                 onReferenceUpload={f => handleAudioSectionUpload(f, 'reference')}
                 onReferenceClear={() => { set('referenceAudioUrl', undefined); set('referenceAudioTitle', undefined); }}
+                onReferenceSongDrop={(url, title) => { set('referenceAudioUrl', url); set('referenceAudioTitle', title); }}
                 coverAudioUrl={params.sourceAudioUrl}
                 coverAudioTitle={params.sourceAudioTitle}
                 onCoverUpload={f => handleAudioSectionUpload(f, 'source')}
                 onCoverClear={() => { set('sourceAudioUrl', undefined); set('sourceAudioTitle', undefined); set('taskType', undefined); }}
+                onCoverSongDrop={(url, title) => { set('sourceAudioUrl', url); set('sourceAudioTitle', title); set('taskType', 'cover'); }}
                 vocalAudioUrl={params.vocalAudioUrl}
                 vocalAudioTitle={params.vocalAudioTitle}
                 onVocalUpload={f => handleAudioSectionUpload(f, 'vocal')}
                 onVocalClear={() => { set('vocalAudioUrl', undefined); set('vocalAudioTitle', undefined); }}
+                onVocalSongDrop={(url, title) => { set('vocalAudioUrl', url); set('vocalAudioTitle', title); }}
                 onRecord={() => { setMicTarget('vocal'); setShowMicRecorder(true); }}
               />
               {/* Lyrics with colored overlay */}

@@ -3,7 +3,7 @@ import { useTranslation } from 'react-i18next';
 import {
   X, Settings, Cpu, Key, Server, RefreshCw, Check, AlertCircle,
   ChevronDown, ChevronRight, Trash2, Eye, EyeOff, Plug, Unplug,
-  Github, Star, ExternalLink, Heart, FolderOpen, Download,
+  Github, Star, ExternalLink, Heart, FolderOpen, Download, MemoryStick,
 } from 'lucide-react';
 
 /* ── Types ── */
@@ -109,7 +109,7 @@ function saveSettings(s: AppSettings) {
   localStorage.setItem(STORAGE_KEY, JSON.stringify(clean));
 }
 
-type Tab = 'general' | 'providers' | 'model';
+type Tab = 'general' | 'providers' | 'model' | 'vram';
 
 interface Props {
   isOpen: boolean;
@@ -212,6 +212,7 @@ export default function SettingsModal({ isOpen, onClose, onSettingsChange }: Pro
   const TABS: { key: Tab; label: string; icon: React.ReactNode }[] = [
     { key: 'providers', label: t('settings.providers'), icon: <Key className="w-4 h-4" /> },
     { key: 'model', label: t('settings.modelInfo'), icon: <Cpu className="w-4 h-4" /> },
+    { key: 'vram', label: t('vram.tab'), icon: <MemoryStick className="w-4 h-4" /> },
     { key: 'general', label: t('settings.general'), icon: <Settings className="w-4 h-4" /> },
   ];
 
@@ -442,6 +443,9 @@ export default function SettingsModal({ isOpen, onClose, onSettingsChange }: Pro
           {/* ════ MODEL INFO TAB ════ */}
           {tab === 'model' && <ModelInfoTab />}
 
+          {/* ════ VRAM TAB ════ */}
+          {tab === 'vram' && <VramTab />}
+
           {/* ════ GENERAL TAB ════ */}
           {tab === 'general' && (
             <div className="space-y-4">
@@ -557,6 +561,380 @@ export default function SettingsModal({ isOpen, onClose, onSettingsChange }: Pro
           </button>
         </div>
       </div>
+    </div>
+  );
+}
+
+/* ── VRAM Management Sub-component ── */
+function VramTab() {
+  const { t } = useTranslation();
+  const [vramStatus, setVramStatus] = useState<import('../../services/api').VramStatus | null>(null);
+  const [diagnostic, setDiagnostic] = useState<any>(null);
+  const [backendStatus, setBackendStatus] = useState<any>(null);
+  const [loading, setLoading] = useState(true);
+  const [purging, setPurging] = useState(false);
+  const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
+
+  const fetchAll = useCallback(async () => {
+    try {
+      const [vram, diag, backend] = await Promise.all([
+        fetch('/api/vram/status').then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/generate/vram/diagnostic').then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/generate/backend-status').then(r => r.ok ? r.json() : null).catch(() => null),
+      ]);
+      setVramStatus(vram);
+      setDiagnostic(diag);
+      setBackendStatus(backend);
+    } catch { /* offline */ }
+    setLoading(false);
+  }, []);
+
+  useEffect(() => { fetchAll(); }, [fetchAll]);
+
+  // Auto-refresh every 5s
+  useEffect(() => {
+    const interval = setInterval(fetchAll, 5000);
+    return () => clearInterval(interval);
+  }, [fetchAll]);
+
+  const handlePurge = useCallback(async () => {
+    setPurging(true);
+    setMessage(null);
+    try {
+      await fetch('/api/vram/purge', { method: 'POST' });
+      setMessage({ text: t('vram.freed'), type: 'success' });
+      await fetchAll();
+    } catch {
+      setMessage({ text: 'Purge failed', type: 'error' });
+    }
+    setPurging(false);
+  }, [fetchAll, t]);
+
+  const handleForceCleanup = useCallback(async () => {
+    setPurging(true);
+    setMessage(null);
+    try {
+      const r = await fetch('/api/generate/vram/force-cleanup', { method: 'POST' });
+      const data = await r.json();
+      const actions = data?.actions || [];
+      setMessage({ text: `${t('vram.freed')} (${actions.length} actions)`, type: 'success' });
+      await fetchAll();
+    } catch {
+      setMessage({ text: 'Force cleanup failed', type: 'error' });
+    }
+    setPurging(false);
+  }, [fetchAll, t]);
+
+  const handleUnloadLora = useCallback(async () => {
+    setPurging(true);
+    setMessage(null);
+    try {
+      await fetch('/api/lora/unload', { method: 'POST' });
+      setMessage({ text: 'LoRA unloaded', type: 'success' });
+      await fetchAll();
+    } catch {
+      setMessage({ text: 'LoRA unload failed', type: 'error' });
+    }
+    setPurging(false);
+  }, [fetchAll]);
+
+  const handleReinitialize = useCallback(async () => {
+    setPurging(true);
+    setMessage(null);
+    try {
+      const r = await fetch('/api/generate/reinitialize', { method: 'POST' });
+      const data = await r.json();
+      setMessage({ text: data.message || 'Server reinitialized', type: 'success' });
+      await fetchAll();
+    } catch {
+      setMessage({ text: 'Reinitialize failed', type: 'error' });
+    }
+    setPurging(false);
+  }, [fetchAll]);
+
+  if (loading) {
+    return (
+      <div className="flex items-center justify-center py-12 text-surface-500">
+        <RefreshCw className="w-5 h-5 animate-spin mr-2" />
+        {t('common.loading')}
+      </div>
+    );
+  }
+
+  const gpu = vramStatus?.gpus?.[0];
+  const torch = vramStatus?.torch;
+  const components = diagnostic?.components || [];
+  const loraState = diagnostic?.lora_state || {};
+  const summary = diagnostic?.summary || {};
+  const dit = backendStatus?.dit || {};
+  const llm = backendStatus?.llm || {};
+
+  const usagePercent = gpu ? Math.round((gpu.used_mb / gpu.total_mb) * 100) : 0;
+  const barColor = usagePercent > 90 ? 'bg-red-500' : usagePercent > 70 ? 'bg-amber-500' : 'bg-green-500';
+
+  return (
+    <div className="space-y-4">
+      {/* GPU Status Bar */}
+      {gpu ? (
+        <div className="rounded-xl bg-surface-100/60 border border-surface-300/40 p-4 space-y-3">
+          <div className="flex items-center justify-between">
+            <div className="flex items-center gap-3">
+              <div className="w-10 h-10 rounded-lg bg-purple-500/15 flex items-center justify-center">
+                <MemoryStick className="w-5 h-5 text-purple-400" />
+              </div>
+              <div>
+                <h3 className="text-sm font-semibold text-surface-900">{gpu.name}</h3>
+                <p className="text-[10px] text-surface-400">{t('vram.gpuInfo')}</p>
+              </div>
+            </div>
+            <button
+              onClick={fetchAll}
+              className="p-1.5 rounded-lg text-surface-400 hover:text-surface-700 hover:bg-surface-200 transition-colors"
+            >
+              <RefreshCw className="w-3.5 h-3.5" />
+            </button>
+          </div>
+
+          {/* VRAM bar */}
+          <div>
+            <div className="flex justify-between text-[10px] text-surface-500 mb-1">
+              <span>{t('vram.used')}: {gpu.used_mb} MB</span>
+              <span>{t('vram.free')}: {gpu.free_mb} MB</span>
+              <span>{t('vram.total')}: {gpu.total_mb} MB</span>
+            </div>
+            <div className="w-full h-3 bg-surface-200 rounded-full overflow-hidden">
+              <div className={`h-full ${barColor} rounded-full transition-all duration-500`} style={{ width: `${usagePercent}%` }} />
+            </div>
+            <div className="flex justify-between text-[10px] mt-1">
+              <span className={`font-semibold ${usagePercent > 90 ? 'text-red-400' : usagePercent > 70 ? 'text-amber-400' : 'text-green-400'}`}>
+                {usagePercent}% {t('vram.usage')}
+              </span>
+              {gpu.temperature > 0 && (
+                <span className="text-surface-400">{gpu.temperature}°C</span>
+              )}
+            </div>
+          </div>
+
+          {/* Torch allocation details */}
+          {torch && (
+            <div className="grid grid-cols-2 gap-2 pt-1 border-t border-surface-300/20">
+              <div className="text-[10px]">
+                <span className="text-surface-400">{t('vram.torchAllocated')}:</span>
+                <span className="text-surface-700 font-medium ml-1">{torch.allocated_mb} MB</span>
+              </div>
+              <div className="text-[10px]">
+                <span className="text-surface-400">{t('vram.torchReserved')}:</span>
+                <span className="text-surface-700 font-medium ml-1">{torch.reserved_mb} MB</span>
+              </div>
+            </div>
+          )}
+        </div>
+      ) : (
+        <div className="text-center py-8 text-surface-500">
+          <AlertCircle className="w-10 h-10 mx-auto mb-3 text-surface-400" />
+          <p className="text-sm">{t('vram.noGpu')}</p>
+        </div>
+      )}
+
+      {/* Loaded Components */}
+      <div className="rounded-xl bg-surface-100/60 border border-surface-300/40 p-4 space-y-3">
+        <h3 className="text-sm font-semibold text-surface-900 flex items-center gap-2">
+          <Cpu className="w-4 h-4 text-surface-500" />
+          {t('vram.components')}
+        </h3>
+
+        <div className="space-y-2">
+          {/* DiT Model */}
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface-200/40 border border-surface-300/20">
+            <div className="flex items-center gap-2.5">
+              <span className={`w-2 h-2 rounded-full ${dit.loaded ? 'bg-green-500' : 'bg-surface-400'}`} />
+              <div>
+                <span className="text-xs font-semibold text-surface-800">{t('vram.ditModel')}</span>
+                {dit.loaded && dit.model && (
+                  <span className="text-[10px] text-surface-400 ml-2">{dit.model}</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {components.find((c: any) => c.name?.includes('DiT'))?.gpu_mb > 0 && (
+                <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-medium">
+                  {components.find((c: any) => c.name?.includes('DiT'))?.gpu_mb} MB GPU
+                </span>
+              )}
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                dit.loaded ? 'text-green-400 bg-green-500/10' : 'text-surface-400 bg-surface-200'
+              }`}>
+                {dit.loaded ? t('settings.loaded') : t('settings.offline')}
+              </span>
+            </div>
+          </div>
+
+          {/* VAE */}
+          {(() => {
+            const vaeComp = components.find((c: any) => c.name === 'VAE');
+            const isOnGpu = vaeComp && vaeComp.gpu_mb > 0;
+            return (
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface-200/40 border border-surface-300/20">
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-2 h-2 rounded-full ${isOnGpu ? 'bg-green-500' : dit.loaded ? 'bg-blue-500' : 'bg-surface-400'}`} />
+                  <span className="text-xs font-semibold text-surface-800">{t('vram.vaeModel')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isOnGpu && (
+                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-medium">
+                      {vaeComp.gpu_mb} MB GPU
+                    </span>
+                  )}
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                    isOnGpu ? 'text-green-400 bg-green-500/10' : dit.loaded ? 'text-blue-400 bg-blue-500/10' : 'text-surface-400 bg-surface-200'
+                  }`}>
+                    {isOnGpu ? 'GPU' : dit.loaded ? 'CPU' : t('settings.offline')}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* Text Encoder */}
+          {(() => {
+            const teComp = components.find((c: any) => c.name === 'Text Encoder');
+            const isOnGpu = teComp && teComp.gpu_mb > 0;
+            return (
+              <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface-200/40 border border-surface-300/20">
+                <div className="flex items-center gap-2.5">
+                  <span className={`w-2 h-2 rounded-full ${isOnGpu ? 'bg-green-500' : dit.loaded ? 'bg-blue-500' : 'bg-surface-400'}`} />
+                  <span className="text-xs font-semibold text-surface-800">{t('vram.textEncoder')}</span>
+                </div>
+                <div className="flex items-center gap-2">
+                  {isOnGpu && (
+                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-medium">
+                      {teComp.gpu_mb} MB GPU
+                    </span>
+                  )}
+                  <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                    isOnGpu ? 'text-green-400 bg-green-500/10' : dit.loaded ? 'text-blue-400 bg-blue-500/10' : 'text-surface-400 bg-surface-200'
+                  }`}>
+                    {isOnGpu ? 'GPU' : dit.loaded ? 'CPU' : t('settings.offline')}
+                  </span>
+                </div>
+              </div>
+            );
+          })()}
+
+          {/* LM Model */}
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface-200/40 border border-surface-300/20">
+            <div className="flex items-center gap-2.5">
+              <span className={`w-2 h-2 rounded-full ${llm.loaded ? 'bg-green-500' : 'bg-surface-400'}`} />
+              <div>
+                <span className="text-xs font-semibold text-surface-800">{t('vram.lmModel')}</span>
+                {llm.loaded && llm.model && (
+                  <span className="text-[10px] text-surface-400 ml-2">{llm.model}</span>
+                )}
+              </div>
+            </div>
+            <div className="flex items-center gap-2">
+              {llm.backend && (
+                <span className="text-[10px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-medium">
+                  {llm.backend}
+                </span>
+              )}
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                llm.loaded ? 'text-green-400 bg-green-500/10' : 'text-surface-400 bg-surface-200'
+              }`}>
+                {llm.loaded ? t('settings.loaded') : t('settings.offline')}
+              </span>
+            </div>
+          </div>
+
+          {/* LoRA */}
+          <div className="flex items-center justify-between px-3 py-2.5 rounded-lg bg-surface-200/40 border border-surface-300/20">
+            <div className="flex items-center gap-2.5">
+              <span className={`w-2 h-2 rounded-full ${loraState.lora_loaded_flag ? 'bg-amber-500' : 'bg-surface-400'}`} />
+              <span className="text-xs font-semibold text-surface-800">{t('vram.loraAdapter')}</span>
+            </div>
+            <div className="flex items-center gap-2">
+              {loraState.lora_loaded_flag && (
+                <>
+                  {loraState.lora_gpu_mb > 0 && (
+                    <span className="text-[10px] text-purple-400 bg-purple-500/10 px-1.5 py-0.5 rounded font-medium">
+                      {loraState.lora_gpu_mb} MB GPU
+                    </span>
+                  )}
+                  <button
+                    onClick={handleUnloadLora}
+                    disabled={purging}
+                    className="text-[10px] px-2 py-0.5 rounded font-medium text-red-400 bg-red-500/10 hover:bg-red-500/20 transition-colors disabled:opacity-50"
+                  >
+                    Unload
+                  </button>
+                </>
+              )}
+              <span className={`text-[9px] px-1.5 py-0.5 rounded font-medium ${
+                loraState.lora_loaded_flag ? 'text-amber-400 bg-amber-500/10' : 'text-surface-400 bg-surface-200'
+              }`}>
+                {loraState.lora_loaded_flag ? (loraState.use_lora_flag ? 'Active' : 'Loaded') : t('settings.offline')}
+              </span>
+            </div>
+          </div>
+        </div>
+
+        {/* Component GPU summary */}
+        {summary.total_component_gpu_mb > 0 && (
+          <div className="text-[10px] text-surface-400 pt-1 border-t border-surface-300/20 flex justify-between">
+            <span>Total GPU: {summary.total_component_gpu_mb} MB</span>
+            {summary.gc_cuda_tensors > 0 && (
+              <span>CUDA tensors: {summary.gc_cuda_tensors} ({summary.gc_cuda_mb} MB)</span>
+            )}
+          </div>
+        )}
+      </div>
+
+      {/* Actions */}
+      <div className="rounded-xl bg-surface-100/60 border border-surface-300/40 p-4 space-y-3">
+        <div className="grid grid-cols-2 gap-2">
+          <button
+            onClick={handlePurge}
+            disabled={purging}
+            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold
+              bg-accent-500/15 text-accent-400 hover:bg-accent-500/25 border border-accent-500/20
+              transition-colors disabled:opacity-50"
+          >
+            <RefreshCw className={`w-3.5 h-3.5 ${purging ? 'animate-spin' : ''}`} />
+            {purging ? t('vram.purging') : t('vram.purgeAll')}
+          </button>
+          <button
+            onClick={handleForceCleanup}
+            disabled={purging}
+            className="flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold
+              bg-amber-500/15 text-amber-400 hover:bg-amber-500/25 border border-amber-500/20
+              transition-colors disabled:opacity-50"
+          >
+            <Trash2 className={`w-3.5 h-3.5`} />
+            {t('vram.forceCleanup')}
+          </button>
+        </div>
+
+        <button
+          onClick={handleReinitialize}
+          disabled={purging}
+          className="w-full flex items-center justify-center gap-1.5 px-3 py-2.5 rounded-lg text-xs font-semibold
+            bg-red-500/10 text-red-400 hover:bg-red-500/20 border border-red-500/20
+            transition-colors disabled:opacity-50"
+        >
+          <AlertCircle className="w-3.5 h-3.5" />
+          {t('vram.reinitialize')}
+        </button>
+        <p className="text-[10px] text-surface-400 text-center">{t('vram.reinitWarn')}</p>
+      </div>
+
+      {/* Status message */}
+      {message && (
+        <div className={`rounded-lg px-3 py-2 text-xs font-medium ${
+          message.type === 'success' ? 'bg-green-500/10 text-green-400 border border-green-500/20' : 'bg-red-500/10 text-red-400 border border-red-500/20'
+        }`}>
+          {message.text}
+        </div>
+      )}
     </div>
   );
 }
