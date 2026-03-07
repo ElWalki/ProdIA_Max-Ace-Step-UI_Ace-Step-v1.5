@@ -5,6 +5,7 @@ const migrations = `
 CREATE TABLE IF NOT EXISTS users (
   id TEXT PRIMARY KEY,
   username TEXT UNIQUE NOT NULL,
+  password_hash TEXT,
   bio TEXT,
   avatar_url TEXT,
   banner_url TEXT,
@@ -169,6 +170,14 @@ function migrate(): void {
       console.error('Migration failed:', error);
       throw error;
     }
+  }
+
+  // Add password_hash column if missing (for existing databases)
+  try {
+    db.exec(`ALTER TABLE users ADD COLUMN password_hash TEXT`);
+    console.log('Added password_hash column to users table.');
+  } catch {
+    // Column already exists — ignore
   }
 }
 

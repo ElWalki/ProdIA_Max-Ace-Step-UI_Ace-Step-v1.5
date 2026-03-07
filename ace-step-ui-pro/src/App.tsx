@@ -19,6 +19,7 @@ import GpuMonitorView from './components/views/GpuMonitorView';
 import StudioView from './components/views/StudioView';
 import SettingsModal from './components/ui/SettingsModal';
 import Toast from './components/ui/Toast';
+import LoginScreen from './components/ui/LoginScreen';
 
 interface ToastState {
   message: string;
@@ -30,7 +31,7 @@ const JOB_TIMEOUT = 600_000; // 10 minutes
 
 export default function App() {
   const { t } = useTranslation();
-  const { user, token } = useAuth();
+  const { user, token, isLoading, needsLogin } = useAuth();
 
   // ─── View ───
   const [currentView, setCurrentView] = useState<View>('create');
@@ -525,6 +526,18 @@ export default function App() {
         return null;
     }
   };
+
+  // Show login/loading screen if auth not ready (after all hooks)
+  if (isLoading) {
+    return (
+      <div className="fixed inset-0 bg-surface-950 flex items-center justify-center">
+        <div className="animate-pulse text-accent-400 text-sm">Loading...</div>
+      </div>
+    );
+  }
+  if (needsLogin || !user) {
+    return <LoginScreen />;
+  }
 
   return (
     <div className="h-screen flex flex-col bg-surface-0 text-surface-900 overflow-hidden">

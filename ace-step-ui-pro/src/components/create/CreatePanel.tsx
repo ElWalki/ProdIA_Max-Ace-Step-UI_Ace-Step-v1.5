@@ -96,6 +96,8 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   const [availableModels, setAvailableModels] = useState<{ name: string; is_active: boolean; is_preloaded: boolean }[]>([]);
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [modelLoading, setModelLoading] = useState(false);
+  const [downloadingModels, setDownloadingModels] = useState<Record<string, { progress: string; status: string }>>({});
+  const downloadPollRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const templateMenuRef = useRef<HTMLDivElement>(null);
 
@@ -159,6 +161,60 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
       setModelLoading(false);
     }
   }, [availableModels, set, token, refreshModels]);
+
+  // Cleanup download poll intervals on unmount
+  useEffect(() => {
+    return () => {
+      Object.values(downloadPollRef.current).forEach(clearInterval);
+    };
+  }, []);
+
+  // Download a model from HuggingFace
+  const handleDownloadModel = useCallback(async (modelName: string, e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (downloadingModels[modelName]) return;
+    setDownloadingModels(prev => ({ ...prev, [modelName]: { progress: '0%', status: 'downloading' } }));
+    try {
+      await generateApi.downloadModel(modelName, token || '');
+      // Start polling progress
+      const pollId = setInterval(async () => {
+        try {
+          const res = await generateApi.getDownloadProgress(modelName);
+          if (res.status === 'done') {
+            clearInterval(pollId);
+            delete downloadPollRef.current[modelName];
+            setDownloadingModels(prev => {
+              const next = { ...prev };
+              delete next[modelName];
+              return next;
+            });
+            refreshModels();
+          } else if (res.status === 'error') {
+            clearInterval(pollId);
+            delete downloadPollRef.current[modelName];
+            setDownloadingModels(prev => ({ ...prev, [modelName]: { progress: '', status: 'error' } }));
+          } else {
+            setDownloadingModels(prev => ({ ...prev, [modelName]: { progress: res.progress || '...', status: 'downloading' } }));
+          }
+        } catch {
+          clearInterval(pollId);
+          delete downloadPollRef.current[modelName];
+          setDownloadingModels(prev => {
+            const next = { ...prev };
+            delete next[modelName];
+            return next;
+          });
+        }
+      }, 2000);
+      downloadPollRef.current[modelName] = pollId;
+    } catch {
+      setDownloadingModels(prev => {
+        const next = { ...prev };
+        delete next[modelName];
+        return next;
+      });
+    }
+  }, [downloadingModels, token, refreshModels]);
 
   // LM model size & backend state
   const LM_SIZES = [
@@ -517,33 +573,75 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                   const info = MODEL_LABELS[m.name];
                   const isSelected = params.ditModel === m.name;
                   const displayLabel = info?.label || m.name.replace('acestep-v15-', '').replace('acestep-', '');
+                  const dl = downloadingModels[m.name];
                   return (
-                    <button
+                    <div
                       key={m.name}
-                      onClick={() => handleLoadModel(m.name)}
-                      disabled={modelLoading || !m.is_preloaded}
-                      className={`w-full flex items-center gap-2.5 px-3 py-2 text-left transition-colors disabled:opacity-40 ${
+                      className={`w-full flex items-center gap-2.5 px-3 py-2 transition-colors ${
                         isSelected ? 'bg-accent-500/10' : 'hover:bg-surface-200'
                       }`}
                     >
-                      <div className="flex-1 min-w-0">
+                      <button
+                        onClick={() => handleLoadModel(m.name)}
+                        disabled={modelLoading || (!m.is_preloaded && !dl)}
+                        className="flex-1 min-w-0 text-left disabled:opacity-40"
+                      >
                         <span className={`text-xs font-semibold block ${isSelected ? 'text-accent-400' : 'text-surface-800'}`}>
                           {displayLabel}
                         </span>
                         <span className="text-[10px] text-surface-400 block truncate">{m.name}</span>
-                      </div>
+                      </button>
                       <div className="flex items-center gap-1.5 shrink-0">
                         {m.is_active && (
                           <span className="text-[9px] text-green-400 bg-green-500/10 px-1.5 py-0.5 rounded font-medium">{t('settings.loaded', 'Loaded')}</span>
                         )}
-                        {!m.is_preloaded && (
-                          <span className="text-[9px] text-amber-400 bg-amber-500/10 px-1.5 py-0.5 rounded font-medium">{t('create.notDownloaded', 'Not loaded')}</span>
+                        {!m.is_preloaded && !dl && (
+                          <button
+                            onClick={(e) => handleDownloadModel(m.name, e)}
+                            className="flex items-center gap-1 text-[9px] text-accent-400 bg-accent-500/10 hover:bg-accent-500/20 px-1.5 py-0.5 rounded font-medium transition-colors"
+                            title={t('create.downloadModel', 'Download model')}
+                          >
+                            <Download className="w-3 h-3" />
+                            {t('create.download', 'Download')}
+                          </button>
+                        )}
+                        {dl && dl.status === 'downloading' && (
+                          <span className="flex items-center gap-1 text-[9px] text-blue-400 bg-blue-500/10 px-1.5 py-0.5 rounded font-medium">
+                            <Loader2 className="w-3 h-3 animate-spin" />
+                            {dl.progress}
+                          </span>
+                        )}
+                        {dl && dl.status === 'error' && (
+                          <button
+                            onClick={(e) => {
+                              setDownloadingModels(prev => { const next = { ...prev }; delete next[m.name]; return next; });
+                              handleDownloadModel(m.name, e);
+                            }}
+                            className="flex items-center gap-1 text-[9px] text-red-400 bg-red-500/10 hover:bg-red-500/20 px-1.5 py-0.5 rounded font-medium transition-colors"
+                            title={t('create.retryDownload', 'Retry download')}
+                          >
+                            <RefreshCw className="w-3 h-3" />
+                            {t('create.retry', 'Retry')}
+                          </button>
                         )}
                         {isSelected && <Check className="w-3 h-3 text-accent-400" />}
                       </div>
-                    </button>
+                    </div>
                   );
                 })}
+                {availableModels.some(m => !m.is_preloaded && !downloadingModels[m.name]) && (
+                  <div className="px-3 py-2 border-t border-surface-300/40">
+                    <button
+                      onClick={(e) => {
+                        availableModels.filter(m => !m.is_preloaded && !downloadingModels[m.name]).forEach(m => handleDownloadModel(m.name, e));
+                      }}
+                      className="w-full flex items-center justify-center gap-1.5 text-[10px] text-accent-400 hover:text-accent-300 font-semibold transition-colors"
+                    >
+                      <Download className="w-3 h-3" />
+                      {t('create.downloadAll', 'Download all')}
+                    </button>
+                  </div>
+                )}
               </div>
             )}
           </div>

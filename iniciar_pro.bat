@@ -148,31 +148,68 @@ start "ACE-Step Gradio API" "%LAUNCHER_DIR%\_gradio.cmd"
 
 REM ─── Esperar Gradio / Wait for Gradio ───────────────────────
 echo.
-echo  Esperando Gradio / Waiting for Gradio API...
-echo  (comprobando / checking http://localhost:8001 cada/every 5s)
+echo ╔══════════════════════════════════════════════════════════════╗
+echo ║   CARGANDO EL MODELO DE IA / LOADING THE AI MODEL           ║
+echo ╠══════════════════════════════════════════════════════════════╣
+echo ║                                                              ║
+echo ║  ACE-Step necesita cargar varios GB de pesos del modelo     ║
+echo ║  en la GPU antes de poder generar musica.                   ║
+echo ║                                                              ║
+echo ║  Esto es NORMAL y ocurre siempre al iniciar:                ║
+echo ║    - Primera vez: puede tardar 2-5 minutos                  ║
+echo ║    - Usos siguientes: 1-2 minutos (cache caliente)          ║
+echo ║                                                              ║
+echo ║  Por favor, SE PACIENTE y no cierres esta ventana.          ║
+echo ║  Please be PATIENT and do not close this window.            ║
+echo ║                                                              ║
+echo ╚══════════════════════════════════════════════════════════════╝
+echo.
 
+set READY=0
 set ATTEMPTS=0
 set MAX_ATTEMPTS=60
 
 :WAIT_GRADIO
 set /a ATTEMPTS+=1
 if %ATTEMPTS% gtr %MAX_ATTEMPTS% (
-    echo  [AVISO] Gradio no respondio en 5 min. Continuando...
+    echo.
+    echo  [AVISO / WARNING] Gradio no respondio / did not respond after 5 min. Continuando / Continuing...
     goto GRADIO_CONTINUE
 )
+
+REM Comprobar si el puerto 8001 esta escuchando
 netstat -aon | findstr ":8001 " | findstr "LISTENING" >nul 2>&1
 if %errorlevel% equ 0 (
+    REM Puerto abierto, verificar que responde HTTP
     powershell -Command "try { $r = Invoke-WebRequest -Uri 'http://localhost:8001/gradio_api/info' -TimeoutSec 3 -ErrorAction Stop; exit 0 } catch { exit 1 }" >nul 2>&1
-    if %errorlevel% equ 0 goto GRADIO_READY
+    if %errorlevel% equ 0 (
+        set READY=1
+        goto GRADIO_READY
+    )
 )
+
+REM Mostrar progreso con mensajes rotatorios segun tiempo transcurrido
 set /a SECS=%ATTEMPTS%*5
-echo    ... %SECS%s esperando / waiting (%ATTEMPTS%/%MAX_ATTEMPTS%)
+if %ATTEMPTS% leq 6 (
+    echo    [%SECS%s] Iniciando Python y cargando dependencias... / Starting Python and loading dependencies...
+) else if %ATTEMPTS% leq 12 (
+    echo    [%SECS%s] Cargando pesos del modelo DiT en GPU... / Loading DiT model weights into GPU...
+) else if %ATTEMPTS% leq 20 (
+    echo    [%SECS%s] Inicializando el backbone LM... / Initializing LM backbone... (esto es normal / this is normal)
+) else if %ATTEMPTS% leq 30 (
+    echo    [%SECS%s] Casi listo... el modelo es grande, espera un poco mas. / Almost there... model is large, hang tight.
+) else (
+    echo    [%SECS%s] Todavia cargando... GPU lenta o disco HDD? Sigue esperando. / Still loading... slow GPU or HDD? Keep waiting.
+)
 timeout /t 5 /nobreak >nul
 goto WAIT_GRADIO
 
 :GRADIO_READY
 echo.
-echo  OK Gradio API listo / ready!
+echo  ╔══════════════════════════════════════════════════════════════╗
+echo  ║  ✓  MODELO LISTO / MODEL READY!                             ║
+echo  ╚══════════════════════════════════════════════════════════════╝
+echo.
 
 :GRADIO_CONTINUE
 

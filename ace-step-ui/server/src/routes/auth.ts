@@ -1,23 +1,90 @@
 import { Router, Request, Response } from 'express';
 import jwt, { SignOptions } from 'jsonwebtoken';
+import crypto from 'crypto';
 import { pool } from '../db/pool.js';
 import { generateUUID } from '../db/sqlite.js';
 import { config } from '../config/index.js';
 import { authMiddleware, AuthenticatedRequest } from '../middleware/auth.js';
-import fs from 'fs';
-import path from 'path';
 
 const jwtOptions = { expiresIn: config.jwt.expiresIn } as SignOptions;
+
+// Simple password hashing with PBKDF2 (no external deps needed)
+function hashPassword(password: string): string {
+  const salt = crypto.randomBytes(16).toString('hex');
+  const hash = crypto.pbkdf2Sync(password, salt, 100_000, 64, 'sha512').toString('hex');
+  return `${salt}:${hash}`;
+}
+
+function verifyPassword(password: string, stored: string): boolean {
+  const [salt, hash] = stored.split(':');
+  if (!salt || !hash) return false;
+  const verify = crypto.pbkdf2Sync(password, salt, 100_000, 64, 'sha512').toString('hex');
+  return crypto.timingSafeEqual(Buffer.from(hash, 'hex'), Buffer.from(verify, 'hex'));
+}
 
 const router = Router();
 
 interface SetupBody {
   username: string;
+  password?: string;
 }
 
 function issueAccessToken(payload: { id: string; username: string }): string {
   return jwt.sign(payload, config.jwt.secret, jwtOptions);
 }
+
+// List all profiles (public info only \u2014 no password hashes)
+router.get('/profiles', async (_req: Request, res: Response) => {
+  try {
+    const result = await pool.query(
+      `SELECT id, username, avatar_url, bio, created_at, 
+       CASE WHEN password_hash IS NOT NULL AND password_hash != '' THEN 1 ELSE 0 END as has_password
+       FROM users ORDER BY created_at ASC`
+    );
+    res.json({ profiles: result.rows.map(r => ({
+      id: r.id,
+      username: r.username,
+      avatar_url: r.avatar_url,
+      bio: r.bio,
+      hasPassword: Boolean(r.has_password),
+      createdAt: r.created_at,
+    }))});
+  } catch (error) {
+    console.error('List profiles error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
+
+// Login to existing profile
+router.post('/login', async (req: Request, res: Response) => {
+  try {
+    const { username, password } = req.body as { username?: string; password?: string };
+    if (!username) { res.status(400).json({ error: 'Username is required' }); return; }
+
+    const result = await pool.query(
+      'SELECT id, username, bio, avatar_url, banner_url, is_admin, password_hash, created_at FROM users WHERE username = ?',
+      [username.trim()]
+    );
+    if (result.rows.length === 0) { res.status(404).json({ error: 'Profile not found' }); return; }
+
+    const user = result.rows[0];
+
+    // If profile has a password, verify it
+    if (user.password_hash) {
+      if (!password) { res.status(401).json({ error: 'Password required' }); return; }
+      if (!verifyPassword(password, user.password_hash)) { res.status(401).json({ error: 'Invalid password' }); return; }
+    }
+
+    const token = issueAccessToken({ id: user.id, username: user.username });
+    res.json({
+      user: { id: user.id, username: user.username, bio: user.bio, avatar_url: user.avatar_url, banner_url: user.banner_url, isAdmin: Boolean(user.is_admin), createdAt: user.created_at },
+      token,
+    });
+  } catch (error) {
+    console.error('Login error:', error);
+    res.status(500).json({ error: 'Internal server error' });
+  }
+});
 
 // Auto-login: Get the default user from database (for local single-user app)
 router.get('/auto', async (_req: Request, res: Response) => {
@@ -59,10 +126,10 @@ router.get('/auto', async (_req: Request, res: Response) => {
   }
 });
 
-// Setup or get user by username (simplified auth for local app)
+// Setup: create new profile with optional password
 router.post('/setup', async (req: Request<object, object, SetupBody>, res: Response) => {
   try {
-    const { username } = req.body;
+    const { username, password } = req.body;
 
     if (!username || typeof username !== 'string') {
       res.status(400).json({ error: 'Username is required' });
@@ -72,7 +139,7 @@ router.post('/setup', async (req: Request<object, object, SetupBody>, res: Respo
     // Sanitize username
     const sanitizedUsername = username
       .trim()
-      .replace(/[^a-zA-Z0-9_-]/g, '')
+      .replace(/[^a-zA-Z0-9_\- ]/g, '')
       .slice(0, 50);
 
     if (sanitizedUsername.length < 2) {
@@ -86,26 +153,26 @@ router.post('/setup', async (req: Request<object, object, SetupBody>, res: Respo
       [sanitizedUsername]
     );
 
-    let user;
-
     if (existingUser.rows.length > 0) {
-      // User exists, return it
-      user = existingUser.rows[0];
-    } else {
-      // Create new user
-      const userId = generateUUID();
-      await pool.query(
-        `INSERT INTO users (id, username, is_admin, created_at, updated_at)
-         VALUES (?, ?, 0, datetime('now'), datetime('now'))`,
-        [userId, sanitizedUsername]
-      );
-
-      const newUser = await pool.query(
-        'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users WHERE id = ?',
-        [userId]
-      );
-      user = newUser.rows[0];
+      // Profile already exists — user should use /login
+      res.status(409).json({ error: 'Profile already exists. Use login instead.' });
+      return;
     }
+
+    // Create new user with optional password
+    const userId = generateUUID();
+    const pwHash = password ? hashPassword(password) : null;
+    await pool.query(
+      `INSERT INTO users (id, username, password_hash, is_admin, created_at, updated_at)
+       VALUES (?, ?, ?, 0, datetime('now'), datetime('now'))`,
+      [userId, sanitizedUsername, pwHash]
+    );
+
+    const newUser = await pool.query(
+      'SELECT id, username, bio, avatar_url, banner_url, is_admin, created_at FROM users WHERE id = ?',
+      [userId]
+    );
+    const user = newUser.rows[0];
 
     // Generate token
     const token = issueAccessToken({
@@ -271,37 +338,6 @@ router.post('/refresh', authMiddleware, async (req: AuthenticatedRequest, res: R
   } catch (error) {
     console.error('Refresh token error:', error);
     res.status(500).json({ error: 'Internal server error' });
-  }
-});
-
-// Reset all user data (delete DB records + audio files)
-router.post('/reset-user', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
-  try {
-    // Delete all songs, playlists, generation jobs, then users
-    await pool.query('DELETE FROM generation_jobs');
-    await pool.query('DELETE FROM playlist_songs');
-    await pool.query('DELETE FROM playlists');
-    await pool.query('DELETE FROM songs');
-    await pool.query('DELETE FROM users');
-
-    // Delete audio files
-    const audioDir = config.storage.audioDir;
-    if (fs.existsSync(audioDir)) {
-      const files = fs.readdirSync(audioDir);
-      let deleted = 0;
-      for (const file of files) {
-        try {
-          fs.unlinkSync(path.join(audioDir, file));
-          deleted++;
-        } catch {}
-      }
-      res.json({ success: true, message: `User data cleared. ${deleted} audio files deleted.` });
-    } else {
-      res.json({ success: true, message: 'User data cleared.' });
-    }
-  } catch (error) {
-    console.error('Reset user error:', error);
-    res.status(500).json({ error: 'Failed to reset user data' });
   }
 });
 
