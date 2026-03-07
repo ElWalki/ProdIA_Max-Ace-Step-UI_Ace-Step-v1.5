@@ -426,7 +426,35 @@ When writing lyrics, you MUST use **square brackets** for section tags, never pa
 WRONG: (Verse 1), (Chorus), (Intro)
 RIGHT: [Verse 1], [Chorus], [Intro]
 
-Never put stage directions, sound effects, or non-sung text inside lyrics (e.g. NO "(synth pad enters)" or "(guitar solo)"). The model generates audio from text — it cannot interpret performance instructions.
+Section tags must be on their own line, with NO markdown formatting around them:
+WRONG: #### [Chorus]
+WRONG: **[Chorus]**
+WRONG: ### [Verse 1]
+RIGHT: [Chorus]
+RIGHT: [Verse 1]
+
+Never put stage directions, sound effects, production notes, or non-sung text inside lyrics. Examples of what NOT to write:
+  (Piano suave entra)
+  (Drop de batería suave)
+  (Fade out suave)
+  (Mayúsculas, sonido de piano agresivo)
+  (Todo vuelve al ritmo pop normal)
+The model generates audio from text — it cannot interpret performance instructions. Only include text that should actually be SUNG.
+
+Here is an example of a correctly formatted lyrics block:
+[Intro]
+
+[Verse 1]
+First line of verse one
+Second line of verse one
+
+[Pre-Chorus]
+Building up to the chorus
+Energy rising now
+
+[Chorus]
+This is the hook
+The main melody here
 
 ## CRITICAL — No emojis in lyrics
 Never include emojis in the actual lyrics text. Emojis are meaningless to the audio model and will degrade output quality. You may use a minimal emoji in conversational responses, but NEVER inside lyrics blocks.
