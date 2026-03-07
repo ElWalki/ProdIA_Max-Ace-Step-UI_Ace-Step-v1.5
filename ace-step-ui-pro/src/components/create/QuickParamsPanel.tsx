@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, useEffect } from 'react';
+import React, { useState, useCallback, useMemo, useEffect, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Settings2, ChevronUp, ChevronDown, GripVertical, X, Plus } from 'lucide-react';
 import SliderField from '../ui/SliderField';
@@ -17,19 +17,40 @@ export interface ExpertParam {
 }
 
 const ALL_PARAMS: ExpertParam[] = [
+  // ── LM (Language Model) ──
   { key: 'lmRepetitionPenalty', label: 'Repetition Penalty', description: 'Penalizes repeated tokens (>1 = less repetition)', min: 1, max: 2, step: 0.05, defaultValue: 1.2 },
   { key: 'noRepeatNgramSize', label: 'No-Repeat N-gram', description: 'Block repeating patterns of N tokens (0 = off)', min: 0, max: 10, step: 1, defaultValue: 0 },
-  { key: 'melodicVariation', label: 'Melodic Variation', description: 'How much melodic variation between sections (%)', min: 0, max: 100, step: 5, defaultValue: 0 },
   { key: 'lmTemperature', label: 'LM Temperature', description: 'Creativity/randomness of language model', min: 0, max: 2, step: 0.05, defaultValue: 0.85 },
   { key: 'lmCfgScale', label: 'LM CFG Scale', description: 'How closely LM follows the prompt', min: 0, max: 5, step: 0.1, defaultValue: 1.5 },
   { key: 'lmTopK', label: 'LM Top-K', description: 'Limit vocabulary to top K tokens', min: 0, max: 500, step: 1, defaultValue: 100 },
   { key: 'lmTopP', label: 'LM Top-P', description: 'Nucleus sampling threshold', min: 0, max: 1, step: 0.01, defaultValue: 0.95 },
+  { key: 'lmBatchChunkSize', label: 'LM Batch Chunk Size', description: 'Chunk size for batched LM inference', min: 1, max: 16, step: 1, defaultValue: 4 },
+  // ── DiT (Diffusion Transformer) ──
   { key: 'guidanceScale', label: 'DiT Guidance Scale', description: 'How closely DiT follows the text prompt', min: 1, max: 30, step: 0.5, defaultValue: 15 },
   { key: 'inferenceSteps', label: 'Inference Steps', description: 'More steps = higher quality but slower', min: 10, max: 200, step: 1, defaultValue: 60 },
   { key: 'shift', label: 'Shift', description: 'Noise schedule shift for DiT', min: 0, max: 10, step: 0.5, defaultValue: 3 },
+  // ── APG (Adaptive Projected Guidance) ──
   { key: 'apgNormThreshold', label: 'APG Norm Threshold', description: 'Adaptive Projected Guidance norm threshold', min: 0, max: 5, step: 0.1, defaultValue: 0 },
   { key: 'apgMomentum', label: 'APG Momentum', description: 'Momentum for APG optimization', min: -1, max: 1, step: 0.05, defaultValue: 0 },
   { key: 'apgEta', label: 'APG Eta', description: 'Learning rate for APG', min: 0, max: 2, step: 0.05, defaultValue: 0 },
+  // ── CFG Interval ──
+  { key: 'cfgIntervalStart', label: 'CFG Interval Start', description: 'Start of the CFG guidance interval (0–1 normalized)', min: 0, max: 1, step: 0.05, defaultValue: 0 },
+  { key: 'cfgIntervalEnd', label: 'CFG Interval End', description: 'End of the CFG guidance interval (0–1 normalized)', min: 0, max: 1, step: 0.05, defaultValue: 1 },
+  // ── Song / Global ──
+  { key: 'bpm', label: 'BPM', description: 'Beats per minute for the generated track', min: 20, max: 300, step: 1, defaultValue: 120 },
+  { key: 'duration', label: 'Duration (s)', description: 'Song length in seconds (0 = auto from lyrics)', min: 0, max: 480, step: 5, defaultValue: 120 },
+  { key: 'batchSize', label: 'Batch Size', description: 'Number of variations to generate at once', min: 1, max: 4, step: 1, defaultValue: 1 },
+  { key: 'seed', label: 'Seed', description: 'Random seed for reproducible generation (0 = random)', min: 0, max: 999999, step: 1, defaultValue: 0 },
+  { key: 'melodicVariation', label: 'Melodic Variation', description: 'How much melodic variation between sections (%)', min: 0, max: 100, step: 5, defaultValue: 0 },
+  { key: 'scoreScale', label: 'Score Scale', description: 'Weight for quality scoring feedback', min: 0, max: 1, step: 0.05, defaultValue: 0 },
+  // ── Repainting ──
+  { key: 'repaintingStart', label: 'Repainting Start', description: 'Start position for section repainting (0–1)', min: 0, max: 1, step: 0.01, defaultValue: 0 },
+  { key: 'repaintingEnd', label: 'Repainting End', description: 'End position for section repainting (0–1)', min: 0, max: 1, step: 0.01, defaultValue: 1 },
+  // ── Audio Cover / LoRA ──
+  { key: 'audioCoverStrength', label: 'Audio Cover Strength', description: 'Blending strength for audio-to-audio cover mode', min: 0, max: 1, step: 0.05, defaultValue: 0.5 },
+  { key: 'loraScale', label: 'LoRA Scale', description: 'Strength of the LoRA fine-tune applied', min: 0, max: 2, step: 0.05, defaultValue: 1 },
+  // ── Sections ──
+  { key: 'sectionMeasures', label: 'Section Measures', description: 'Number of measures per section in section mode', min: 1, max: 64, step: 1, defaultValue: 4 },
 ];
 
 interface QuickParamsPanelProps {
@@ -52,6 +73,19 @@ export default function QuickParamsPanel({ values, onChange }: QuickParamsPanelP
   });
   const [pinned, setPinned] = useState(loadPinned);
   const [showPicker, setShowPicker] = useState(false);
+  const pickerRef = useRef<HTMLDivElement>(null);
+
+  // Close picker on click outside
+  useEffect(() => {
+    if (!showPicker) return;
+    const handler = (e: MouseEvent) => {
+      if (pickerRef.current && !pickerRef.current.contains(e.target as Node)) {
+        setShowPicker(false);
+      }
+    };
+    document.addEventListener('mousedown', handler);
+    return () => document.removeEventListener('mousedown', handler);
+  }, [showPicker]);
 
   useEffect(() => {
     localStorage.setItem(LS_EXPANDED, String(expanded));
@@ -131,7 +165,7 @@ export default function QuickParamsPanel({ values, onChange }: QuickParamsPanelP
           ))}
 
           {/* Add param button + picker */}
-          <div className="relative">
+          <div className="relative" ref={pickerRef}>
             <button
               onClick={() => setShowPicker(!showPicker)}
               className="flex items-center gap-1 text-[10px] text-accent-400 hover:text-accent-300 transition-colors"
@@ -141,7 +175,7 @@ export default function QuickParamsPanel({ values, onChange }: QuickParamsPanelP
             </button>
 
             {showPicker && unpinned.length > 0 && (
-              <div className="absolute bottom-6 left-0 z-20 bg-surface-50 border border-surface-300 rounded-lg shadow-xl p-1.5 min-w-[200px] max-h-[200px] overflow-y-auto">
+              <div className="absolute bottom-6 left-0 z-20 bg-surface-50 border border-surface-300 rounded-lg shadow-xl p-1.5 min-w-[220px] max-h-[260px] overflow-y-auto">
                 {unpinned.map(p => (
                   <button
                     key={p.key}
