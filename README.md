@@ -203,5 +203,5 @@ See [ACE-Step-1.5_/LICENSE](ACE-Step-1.5_/LICENSE) for the full license text.
 <p align="center">
   Built on top of the amazing work of <a href="https://github.com/fspecii/ace-step-ui">fspecii</a> and the <a href="https://github.com/ace-step/ACE-Step-1.5">ACE-Step team</a>.<br>
   i18n system & translations contributed by <a href="https://github.com/scruffynerf">scruffynerf</a>.<br>
-  <em>Stop paying for Suno. Start creating with ACE-Step.</em>
+  <em>Stop paying subscriptions. Start creating with ACE-Step.</em>
 </p>
