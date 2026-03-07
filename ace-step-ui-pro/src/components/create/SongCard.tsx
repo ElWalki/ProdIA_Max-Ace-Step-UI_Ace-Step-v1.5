@@ -1,4 +1,4 @@
-import React, { useState, useCallback, useMemo, memo } from 'react';
+import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Music, Play, Pause, Loader2, Clock, MoreVertical } from 'lucide-react';
 import type { Song } from '../../types';
@@ -13,11 +13,15 @@ interface SongCardProps {
   onDelete?: () => void;
   onMenuAction?: (key: string) => void;
   onSelect?: () => void;
+  onRename?: (newTitle: string) => void;
 }
 
-export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDelete, onMenuAction, onSelect }: SongCardProps) {
+export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDelete, onMenuAction, onSelect, onRename }: SongCardProps) {
   const { t } = useTranslation();
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
+  const [isEditing, setIsEditing] = useState(false);
+  const [editTitle, setEditTitle] = useState('');
+  const titleInputRef = useRef<HTMLInputElement>(null);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
     e.preventDefault();
@@ -26,6 +30,29 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
   }, []);
 
   const coverStyle = useMemo(() => getCoverStyle(song.id), [song.id]);
+
+  const handleTitleClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    if (onRename) {
+      setEditTitle(song.title || '');
+      setIsEditing(true);
+    }
+  }, [onRename, song.title]);
+
+  const commitRename = useCallback(() => {
+    const trimmed = editTitle.trim();
+    if (trimmed && trimmed !== song.title && onRename) {
+      onRename(trimmed);
+    }
+    setIsEditing(false);
+  }, [editTitle, song.title, onRename]);
+
+  useEffect(() => {
+    if (isEditing && titleInputRef.current) {
+      titleInputRef.current.focus();
+      titleInputRef.current.select();
+    }
+  }, [isEditing]);
 
   const handleMoreClick = useCallback((e: React.MouseEvent) => {
     e.stopPropagation();
@@ -90,7 +117,25 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
         {/* Info */}
         <div className="flex-1 min-w-0">
           <div className="flex items-center gap-1.5">
-            <p className="text-sm font-medium text-surface-900 truncate">{song.title || 'Untitled'}</p>
+            {isEditing ? (
+              <input
+                ref={titleInputRef}
+                value={editTitle}
+                onChange={e => setEditTitle(e.target.value)}
+                onBlur={commitRename}
+                onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setIsEditing(false); }}
+                className="text-sm font-medium text-surface-900 bg-surface-100 border border-accent-500/40 rounded px-1 py-0 w-full min-w-0 outline-none"
+                onClick={e => e.stopPropagation()}
+              />
+            ) : (
+              <p
+                className="text-sm font-medium text-surface-900 truncate cursor-text hover:text-accent-400 transition-colors"
+                onClick={handleTitleClick}
+                title={t('create.clickToRename', 'Click to rename')}
+              >
+                {song.title || 'Untitled'}
+              </p>
+            )}
             {/* Model badge */}
             {(song.ditModel || song.generationParams?.ditModel) && (
               <span className="text-[8px] px-1 py-0.5 rounded bg-blue-500/10 text-blue-400 font-medium shrink-0 leading-none">

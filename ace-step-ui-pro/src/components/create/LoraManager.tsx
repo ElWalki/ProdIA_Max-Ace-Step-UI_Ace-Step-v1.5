@@ -125,12 +125,33 @@ export default function LoraManager({
     setCustomPath('');
   }, [customPath, onLoadLora]);
 
-  const handleContextMenuAction = useCallback((lora: LoraEntry) => {
+  const handleContextMenuAction = useCallback((action: string, lora: LoraEntry) => {
     setContextMenu(null);
-    // Copy path to clipboard
-    const path = lora.variants[0]?.path || lora.sourceDir || '';
-    if (path) navigator.clipboard.writeText(path);
-  }, []);
+    switch (action) {
+      case 'load': {
+        const v = lora.variants[0];
+        if (v) handleSelectVariant(lora, v);
+        break;
+      }
+      case 'favorite':
+        toggleFav(lora.name);
+        break;
+      case 'copyPath': {
+        const path = lora.variants[0]?.path || lora.sourceDir || '';
+        if (path) navigator.clipboard.writeText(path);
+        break;
+      }
+      case 'openFolder': {
+        const dir = lora.sourceDir || '';
+        if (dir) {
+          generateApi.openFolder?.({ folderPath: dir }, token).catch(() => {
+            navigator.clipboard.writeText(dir);
+          });
+        }
+        break;
+      }
+    }
+  }, [handleSelectVariant, toggleFav, token]);
 
   if (!isOpen) return null;
 
@@ -419,13 +440,32 @@ export default function LoraManager({
           onContextMenu={e => { e.preventDefault(); setContextMenu(null); }}
         >
           <div
-            className="absolute bg-surface-50 border border-surface-300 rounded-lg shadow-xl py-1 min-w-[160px]
+            className="absolute bg-surface-50 border border-surface-300 rounded-lg shadow-xl py-1 min-w-[180px]
               animate-scale-in"
             style={{ left: contextMenu.x, top: contextMenu.y }}
             onClick={e => e.stopPropagation()}
           >
             <button
-              onClick={() => handleContextMenuAction(contextMenu.lora)}
+              onClick={() => handleContextMenuAction('load', contextMenu.lora)}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-surface-700
+                hover:bg-surface-100 transition-colors"
+            >
+              <Power className="w-3 h-3" />
+              {t('lora.load', 'Load')}
+            </button>
+            <button
+              onClick={() => handleContextMenuAction('favorite', contextMenu.lora)}
+              className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-surface-700
+                hover:bg-surface-100 transition-colors"
+            >
+              <Star className="w-3 h-3" fill={favorites.has(contextMenu.lora.name) ? 'currentColor' : 'none'} />
+              {favorites.has(contextMenu.lora.name)
+                ? t('lora.removeFavorite', 'Remove favorite')
+                : t('lora.addFavorite', 'Add favorite')}
+            </button>
+            <div className="border-t border-surface-200 my-0.5" />
+            <button
+              onClick={() => handleContextMenuAction('copyPath', contextMenu.lora)}
               className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-surface-700
                 hover:bg-surface-100 transition-colors"
             >
@@ -434,15 +474,12 @@ export default function LoraManager({
             </button>
             {contextMenu.lora.sourceDir && (
               <button
-                onClick={() => {
-                  setContextMenu(null);
-                  navigator.clipboard.writeText(contextMenu.lora.sourceDir);
-                }}
+                onClick={() => handleContextMenuAction('openFolder', contextMenu.lora)}
                 className="w-full flex items-center gap-2 px-3 py-1.5 text-xs text-surface-700
                   hover:bg-surface-100 transition-colors"
               >
                 <FolderOpen className="w-3 h-3" />
-                {t('lora.copyFolder', 'Copy folder path')}
+                {t('lora.openFolder', 'Open folder')}
               </button>
             )}
             {contextMenu.lora.baseModel && (

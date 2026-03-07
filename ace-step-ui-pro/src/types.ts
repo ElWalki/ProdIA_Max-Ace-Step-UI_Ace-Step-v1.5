@@ -32,6 +32,7 @@ export interface GenerationParams {
   title: string;
   ditModel?: string;
   instrumental: boolean;
+  singer: '' | 'male' | 'female';
   vocalLanguage: string;
   bpm: number;
   keyScale: string;
@@ -167,6 +168,7 @@ export const DEFAULT_PARAMS: GenerationParams = {
   style: '',
   title: '',
   instrumental: false,
+  singer: '',
   vocalLanguage: 'en',
   bpm: 120,
   keyScale: '',

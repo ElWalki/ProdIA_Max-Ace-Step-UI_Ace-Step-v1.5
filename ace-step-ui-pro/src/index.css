@@ -40,6 +40,12 @@
   --color-glow: #6366f180;
 }
 
+/* ── Text selection ── */
+::selection {
+  background-color: var(--color-brand-400);
+  color: #fff;
+}
+
 /* ── Base defaults ── */
 html {
   background-color: var(--color-surface-0);

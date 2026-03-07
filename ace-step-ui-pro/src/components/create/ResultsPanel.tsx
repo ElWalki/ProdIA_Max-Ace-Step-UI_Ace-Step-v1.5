@@ -19,9 +19,10 @@ interface ResultsPanelProps {
   onDeleteSong: (id: string) => void;
   onMenuAction?: (action: string, song: Song) => void;
   onSelectSong?: (song: Song) => void;
+  onRenameSong?: (id: string, newTitle: string) => void;
 }
 
-export default memo(function ResultsPanel({ songs, currentSong, isPlaying, onPlaySong, onDeleteSong, onMenuAction, onSelectSong }: ResultsPanelProps) {
+export default memo(function ResultsPanel({ songs, currentSong, isPlaying, onPlaySong, onDeleteSong, onMenuAction, onSelectSong, onRenameSong }: ResultsPanelProps) {
   const { t } = useTranslation();
   const [page, setPage] = useState(1);
   const [pageSize, setPageSize] = useState(getInitPageSize);
@@ -121,6 +122,7 @@ export default memo(function ResultsPanel({ songs, currentSong, isPlaying, onPla
             onDelete={() => onDeleteSong(song.id)}
             onMenuAction={onMenuAction ? (action: string) => onMenuAction(action, song) : undefined}
             onSelect={onSelectSong ? () => onSelectSong(song) : undefined}
+            onRename={onRenameSong ? (newTitle: string) => onRenameSong(song.id, newTitle) : undefined}
           />
         ))}
       </div>

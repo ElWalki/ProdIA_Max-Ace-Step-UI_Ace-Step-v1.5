@@ -242,6 +242,20 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
       finalParams.duration = -1;
     }
 
+    // Inject singer gender tag into the prompt/style
+    if (finalParams.singer && !finalParams.instrumental) {
+      const tag = finalParams.singer === 'male' ? 'male vocal' : 'female vocal';
+      if (finalParams.customMode) {
+        finalParams.style = finalParams.style
+          ? `${finalParams.style}, ${tag}`
+          : tag;
+      } else {
+        finalParams.songDescription = finalParams.songDescription
+          ? `${finalParams.songDescription}, ${tag}`
+          : tag;
+      }
+    }
+
     // Section mode overrides
     if (finalParams.sectionMode) {
       finalParams.batchSize = 1;
@@ -330,6 +344,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
       set('loraLoaded', true);
       set('loraEnabled', true);
       set('loraScale', 1.0);
+      set('loraTriggerTag', r.trigger_tag ?? '');
     } catch { /* ignore */ }
   }, [token, set]);
 
@@ -353,7 +368,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
     const next = !loraEnabled;
     setLoraEnabled(next);
     set('loraEnabled', next);
-    try { await generateApi.toggleLora(token); } catch { /* ignore */ }
+    try { await generateApi.toggleLora({ enabled: next }, token); } catch { /* ignore */ }
   }, [token, loraEnabled, set]);
 
   const handleLoraTagPosition = useCallback(async (pos: string) => {
@@ -888,6 +903,30 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
               onToggle={() => toggleSection('voice')}
             >
               <SelectField label={t('common.language')} value={params.vocalLanguage} onChange={v => set('vocalLanguage', v)} options={vocalOptions} />
+              {!params.instrumental && (
+                <div className="flex items-center gap-2">
+                  <label className="text-xs text-surface-500 w-24 shrink-0">{t('create.singer', 'Voice')}</label>
+                  <div className="flex gap-1 flex-1">
+                    {[
+                      { value: '', label: 'Auto' },
+                      { value: 'male', label: t('create.singerMale', 'Male') },
+                      { value: 'female', label: t('create.singerFemale', 'Female') },
+                    ].map(opt => (
+                      <button
+                        key={opt.value}
+                        onClick={() => set('singer', opt.value as '' | 'male' | 'female')}
+                        className={`flex-1 px-2 py-1.5 rounded-lg text-xs font-medium transition-colors border ${
+                          params.singer === opt.value
+                            ? 'bg-accent-500/20 text-accent-400 border-accent-500/30'
+                            : 'bg-surface-100 text-surface-500 border-surface-300 hover:bg-surface-200'
+                        }`}
+                      >
+                        {opt.label}
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
               <button
                 onClick={() => { setMicTarget('vocal'); setShowMicRecorder(true); }}
                 className="flex items-center gap-1.5 px-3 py-1.5 rounded-lg text-xs font-medium

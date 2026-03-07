@@ -20,9 +20,10 @@ interface LibraryViewProps {
   onDeleteSong: (id: string) => void;
   onMenuAction?: (action: string, song: Song) => void;
   onSelectSong?: (song: Song) => void;
+  onRenameSong?: (id: string, newTitle: string) => void;
 }
 
-export default function LibraryView({ songs, currentSong, isPlaying, onPlaySong, onDeleteSong, onMenuAction, onSelectSong }: LibraryViewProps) {
+export default function LibraryView({ songs, currentSong, isPlaying, onPlaySong, onDeleteSong, onMenuAction, onSelectSong, onRenameSong }: LibraryViewProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [filterKey, setFilterKey] = useState<FilterKey>('all');
@@ -186,6 +187,7 @@ export default function LibraryView({ songs, currentSong, isPlaying, onPlaySong,
               onDelete={() => onDeleteSong(song.id)}
               onMenuAction={onMenuAction ? (action: string) => onMenuAction(action, song) : undefined}
               onSelect={onSelectSong ? () => onSelectSong(song) : undefined}
+              onRename={onRenameSong ? (newTitle: string) => onRenameSong(song.id, newTitle) : undefined}
             />
           ))}
         </div>

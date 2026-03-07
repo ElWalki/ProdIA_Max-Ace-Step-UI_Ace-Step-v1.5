@@ -195,6 +195,17 @@ export default function App() {
     }
   }, [currentSong, token, showToast, t]);
 
+  // ─── Rename song ───
+  const renameSong = useCallback(async (id: string, newTitle: string) => {
+    if (!token) return;
+    try {
+      await songsApi.updateSong(id, { title: newTitle }, token);
+      setSongs(prev => prev.map(s => s.id === id ? { ...s, title: newTitle } : s));
+    } catch {
+      showToast(t('common.error'), 'error');
+    }
+  }, [token, showToast, t]);
+
   // ─── Job polling ───
   const cleanupJob = useCallback((jobId: string) => {
     const entry = activeJobsRef.current.get(jobId);
@@ -459,6 +470,7 @@ export default function App() {
                 onDeleteSong={deleteSong}
                 onMenuAction={handleMenuAction}
                 onSelectSong={setDetailSong}
+                onRenameSong={renameSong}
               />
             </div>
             {detailSong && (
@@ -483,6 +495,7 @@ export default function App() {
               onDeleteSong={deleteSong}
               onMenuAction={handleMenuAction}
               onSelectSong={setDetailSong}
+              onRenameSong={renameSong}
             />
             {detailSong && (
               <SongDetailPanel

@@ -122,14 +122,16 @@ export const generateApi = {
     api<{ loaded: boolean; active: boolean; scale: number; path: string; trigger_tag: string; tag_position: string; name: string }>('/api/lora/status', { token }),
   setLoraScale: (params: { scale: number }, token: string) =>
     api<{ message: string; scale: number }>('/api/lora/scale', { method: 'POST', body: params, token }),
-  toggleLora: (token: string) =>
-    api<{ message: string; enabled: boolean }>('/api/lora/toggle', { method: 'POST', token }),
+  toggleLora: (params: { enabled: boolean }, token: string) =>
+    api<{ message: string; enabled: boolean }>('/api/lora/toggle', { method: 'POST', body: params, token }),
   setLoraTagPosition: (params: { position: string }, token: string) =>
     api<{ message: string }>('/api/lora/tag-position', { method: 'POST', body: params, token }),
   listLoras: (token: string, directories?: string[]) =>
     api<{ loras: any[]; defaultDirectory: string }>('/api/lora/list', { method: 'POST', body: { directories }, token }),
   validateLoraDir: (dir: string, token: string) =>
     api<{ valid: boolean; count: number }>('/api/lora/validate-dir', { method: 'POST', body: { directory: dir }, token }),
+  openFolder: (params: { folderPath: string }, token: string) =>
+    api<{ success: boolean }>('/api/lora/open-folder', { method: 'POST', body: params, token }),
 
   // Stems
   separateStems: (params: { audioUrl: string; quality?: string; backend?: string; model?: string; stems?: number }, token: string) =>
