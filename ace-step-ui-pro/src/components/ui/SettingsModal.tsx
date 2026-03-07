@@ -5,6 +5,7 @@ import {
   ChevronDown, ChevronRight, Trash2, Eye, EyeOff, Plug, Unplug,
   Github, Star, ExternalLink, Heart, FolderOpen, Download, MemoryStick,
 } from 'lucide-react';
+import { useAuth } from '../../context/AuthContext';
 
 /* ── Types ── */
 export interface AiProvider {
@@ -568,6 +569,7 @@ export default function SettingsModal({ isOpen, onClose, onSettingsChange }: Pro
 /* ── VRAM Management Sub-component ── */
 function VramTab() {
   const { t } = useTranslation();
+  const { token } = useAuth();
   const [vramStatus, setVramStatus] = useState<import('../../services/api').VramStatus | null>(null);
   const [diagnostic, setDiagnostic] = useState<any>(null);
   const [backendStatus, setBackendStatus] = useState<any>(null);
@@ -575,19 +577,21 @@ function VramTab() {
   const [purging, setPurging] = useState(false);
   const [message, setMessage] = useState<{ text: string; type: 'success' | 'error' } | null>(null);
 
+  const authHeaders: Record<string, string> = token ? { Authorization: `Bearer ${token}` } : {};
+
   const fetchAll = useCallback(async () => {
     try {
       const [vram, diag, backend] = await Promise.all([
-        fetch('/api/vram/status').then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch('/api/generate/vram/diagnostic').then(r => r.ok ? r.json() : null).catch(() => null),
-        fetch('/api/generate/backend-status').then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/vram/status', { headers: authHeaders }).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/generate/vram/diagnostic', { headers: authHeaders }).then(r => r.ok ? r.json() : null).catch(() => null),
+        fetch('/api/generate/backend-status', { headers: authHeaders }).then(r => r.ok ? r.json() : null).catch(() => null),
       ]);
       setVramStatus(vram);
       setDiagnostic(diag);
       setBackendStatus(backend);
     } catch { /* offline */ }
     setLoading(false);
-  }, []);
+  }, [token]);
 
   useEffect(() => { fetchAll(); }, [fetchAll]);
 
@@ -601,20 +605,20 @@ function VramTab() {
     setPurging(true);
     setMessage(null);
     try {
-      await fetch('/api/vram/purge', { method: 'POST' });
+      await fetch('/api/vram/purge', { method: 'POST', headers: authHeaders });
       setMessage({ text: t('vram.freed'), type: 'success' });
       await fetchAll();
     } catch {
       setMessage({ text: 'Purge failed', type: 'error' });
     }
     setPurging(false);
-  }, [fetchAll, t]);
+  }, [fetchAll, t, token]);
 
   const handleForceCleanup = useCallback(async () => {
     setPurging(true);
     setMessage(null);
     try {
-      const r = await fetch('/api/generate/vram/force-cleanup', { method: 'POST' });
+      const r = await fetch('/api/generate/vram/force-cleanup', { method: 'POST', headers: authHeaders });
       const data = await r.json();
       const actions = data?.actions || [];
       setMessage({ text: `${t('vram.freed')} (${actions.length} actions)`, type: 'success' });
@@ -623,26 +627,26 @@ function VramTab() {
       setMessage({ text: 'Force cleanup failed', type: 'error' });
     }
     setPurging(false);
-  }, [fetchAll, t]);
+  }, [fetchAll, t, token]);
 
   const handleUnloadLora = useCallback(async () => {
     setPurging(true);
     setMessage(null);
     try {
-      await fetch('/api/lora/unload', { method: 'POST' });
+      await fetch('/api/lora/unload', { method: 'POST', headers: authHeaders });
       setMessage({ text: 'LoRA unloaded', type: 'success' });
       await fetchAll();
     } catch {
       setMessage({ text: 'LoRA unload failed', type: 'error' });
     }
     setPurging(false);
-  }, [fetchAll]);
+  }, [fetchAll, token]);
 
   const handleReinitialize = useCallback(async () => {
     setPurging(true);
     setMessage(null);
     try {
-      const r = await fetch('/api/generate/reinitialize', { method: 'POST' });
+      const r = await fetch('/api/generate/reinitialize', { method: 'POST', headers: authHeaders });
       const data = await r.json();
       setMessage({ text: data.message || 'Server reinitialized', type: 'success' });
       await fetchAll();
@@ -650,7 +654,7 @@ function VramTab() {
       setMessage({ text: 'Reinitialize failed', type: 'error' });
     }
     setPurging(false);
-  }, [fetchAll]);
+  }, [fetchAll, token]);
 
   if (loading) {
     return (

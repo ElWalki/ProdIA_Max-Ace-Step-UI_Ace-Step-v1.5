@@ -2,7 +2,7 @@ import React, { useRef, useState, useEffect, useCallback, memo } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX,
-  Shuffle, Repeat, Repeat1, Download, Heart,
+  Shuffle, Repeat, Repeat1, Download, Heart, ListPlus,
 } from 'lucide-react';
 import type { Song } from '../../types';
 
@@ -17,11 +17,13 @@ interface PlayerBarProps {
   onSongEnd: () => void;
   isLiked?: boolean;
   onToggleLike?: () => void;
+  onClickTitle?: () => void;
+  onAddToPlaylist?: () => void;
 }
 
 export default memo(function PlayerBar({
   song, songs, isPlaying, onPlayPause, onNext, onPrevious,
-  audioRef, onSongEnd, isLiked, onToggleLike,
+  audioRef, onSongEnd, isLiked, onToggleLike, onClickTitle, onAddToPlaylist,
 }: PlayerBarProps) {
   const { t } = useTranslation();
   const [progress, setProgress] = useState(0);
@@ -131,12 +133,22 @@ export default memo(function PlayerBar({
             )}
           </div>
           <div className="min-w-0">
-            <p className="text-sm font-medium text-surface-900 truncate">{song.title || 'Untitled'}</p>
+            <p
+              className={`text-sm font-medium text-surface-900 truncate ${onClickTitle ? 'cursor-pointer hover:text-accent-400 transition-colors' : ''}`}
+              onClick={onClickTitle}
+            >
+              {song.title || 'Untitled'}
+            </p>
             <p className="text-xs text-surface-500 truncate">{song.style || song.creator || ''}</p>
           </div>
           {onToggleLike && (
             <button onClick={onToggleLike} className="ml-1 flex-shrink-0">
-              <Heart className={`w-4 h-4 ${isLiked ? 'fill-red-500 text-red-500' : 'text-surface-400 hover:text-surface-600'}`} />
+              <Heart className={`w-4 h-4 transition-colors ${isLiked ? 'fill-pink-500 text-pink-500' : 'text-surface-400 hover:text-pink-400'}`} />
+            </button>
+          )}
+          {onAddToPlaylist && (
+            <button onClick={onAddToPlaylist} className="flex-shrink-0" title={t('common.addToPlaylist')}>
+              <ListPlus className="w-4 h-4 text-surface-400 hover:text-surface-600 transition-colors" />
             </button>
           )}
         </div>

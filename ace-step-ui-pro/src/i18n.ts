@@ -4,7 +4,7 @@ import LanguageDetector from 'i18next-browser-languagedetector';
 
 const en = {
   app: { title: 'ProdIA Max v2', subtitle: 'AI Music Generator' },
-  nav: { create: 'Create', library: 'Library', training: 'Training', explore: 'Explore', gpu: 'GPU' },
+  nav: { create: 'Create', library: 'Library', studio: 'ProdIA Studio', training: 'Training', explore: 'Explore', gpu: 'GPU' },
   create: {
     title: 'Create Music',
     simpleMode: 'Simple',
@@ -458,11 +458,26 @@ const en = {
     resetPath: 'Reset to default',
     reset: 'Reset',
   },
+  studio: {
+    title: 'ProdIA Studio',
+    subtitle: 'Professional audio editing and production tools for your AI-generated music. Coming soon.',
+    waveform: 'Waveform Editor',
+    waveformDesc: 'Professional audio waveform visualization and editing, like Ableton Live or FL Studio.',
+    stems: 'Stem Separation',
+    stemsDesc: 'Separate vocals, drums, bass, and other instruments from your tracks.',
+    repaint: 'Repaint & Inpaint',
+    repaintDesc: 'Regenerate selected sections of a song while keeping the rest intact.',
+    arrange: 'Arrangement',
+    arrangeDesc: 'Arrange and sequence multiple sections into a complete production.',
+    regenerate: 'Smart Regenerate',
+    regenerateDesc: 'AI-powered regeneration of specific parts with style transfer and variation control.',
+    comingSoon: 'Coming soon — Under development',
+  },
 };
 
 const es: typeof en = {
   app: { title: 'ProdIA Max v2', subtitle: 'Generador Musical con IA' },
-  nav: { create: 'Crear', library: 'Biblioteca', training: 'Entrenamiento', explore: 'Explorar', gpu: 'GPU' },
+  nav: { create: 'Crear', library: 'Biblioteca', studio: 'ProdIA Studio', training: 'Entrenamiento', explore: 'Explorar', gpu: 'GPU' },
   create: {
     title: 'Crear Música',
     simpleMode: 'Simple',
@@ -915,6 +930,21 @@ const es: typeof en = {
     pathHint: 'Establece una ruta personalizada si tus checkpoints están en otro disco o directorio.',
     resetPath: 'Restablecer por defecto',
     reset: 'Restablecer',
+  },
+  studio: {
+    title: 'ProdIA Studio',
+    subtitle: 'Herramientas profesionales de edición y producción de audio para tu música generada con IA. Próximamente.',
+    waveform: 'Editor de Forma de Onda',
+    waveformDesc: 'Visualización y edición profesional de ondas de audio, como Ableton Live o FL Studio.',
+    stems: 'Separación de Stems',
+    stemsDesc: 'Separa voces, batería, bajo y otros instrumentos de tus pistas.',
+    repaint: 'Repintar e Inpintar',
+    repaintDesc: 'Regenera secciones seleccionadas de una canción manteniendo el resto intacto.',
+    arrange: 'Arreglo',
+    arrangeDesc: 'Organiza y secuencia múltiples secciones en una producción completa.',
+    regenerate: 'Regeneración Inteligente',
+    regenerateDesc: 'Regeneración potenciada por IA de partes específicas con transferencia de estilo y control de variación.',
+    comingSoon: 'Próximamente — En desarrollo',
   },
 };
 

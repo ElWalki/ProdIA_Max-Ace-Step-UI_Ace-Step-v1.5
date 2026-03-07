@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Music, Play, Pause, Loader2, Clock, MoreVertical } from 'lucide-react';
+import { Music, Play, Pause, Loader2, Clock, MoreVertical, Heart } from 'lucide-react';
 import type { Song } from '../../types';
 import SongContextMenu from '../ui/SongContextMenu';
 import { getCoverStyle } from '../../utils/coverArt';
@@ -14,9 +14,10 @@ interface SongCardProps {
   onMenuAction?: (key: string) => void;
   onSelect?: () => void;
   onRename?: (newTitle: string) => void;
+  onLike?: () => void;
 }
 
-export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDelete, onMenuAction, onSelect, onRename }: SongCardProps) {
+export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDelete, onMenuAction, onSelect, onRename, onLike }: SongCardProps) {
   const { t } = useTranslation();
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
@@ -124,8 +125,9 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
                 onChange={e => setEditTitle(e.target.value)}
                 onBlur={commitRename}
                 onKeyDown={e => { if (e.key === 'Enter') commitRename(); if (e.key === 'Escape') setIsEditing(false); }}
-                className="text-sm font-medium text-surface-900 bg-surface-100 border border-accent-500/40 rounded px-1 py-0 w-full min-w-0 outline-none"
+                className="text-sm font-medium text-surface-900 bg-surface-100 border border-accent-500/40 rounded px-1 py-0 w-full min-w-0 outline-none select-text"
                 onClick={e => e.stopPropagation()}
+                onMouseDown={e => e.stopPropagation()}
               />
             ) : (
               <p
@@ -150,6 +152,27 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
                   ? ` ×${song.generationParams.loraScale.toFixed(1)}`
                   : ''}
               </span>
+            )}
+            {/* ODE/SDE badge */}
+            {song.generationParams?.inferMethod && (
+              <span className="text-[8px] px-1 py-0.5 rounded bg-teal-500/10 text-teal-400 font-medium shrink-0 leading-none uppercase">
+                {song.generationParams.inferMethod}
+              </span>
+            )}
+            {/* vLLM badge */}
+            {song.generationParams?.lmBackend === 'vllm' && (
+              <span className="text-[8px] px-1 py-0.5 rounded bg-amber-500/10 text-amber-400 font-medium shrink-0 leading-none">
+                vLLM
+              </span>
+            )}
+            {/* Like icon */}
+            {onLike && (
+              <button
+                onClick={(e) => { e.stopPropagation(); onLike(); }}
+                className="shrink-0 ml-auto"
+              >
+                <Heart className={`w-3.5 h-3.5 transition-colors ${song.liked ? 'fill-pink-500 text-pink-500' : 'text-surface-400 hover:text-pink-400'}`} />
+              </button>
             )}
           </div>
           <div className="flex items-center gap-2 text-xs text-surface-500">

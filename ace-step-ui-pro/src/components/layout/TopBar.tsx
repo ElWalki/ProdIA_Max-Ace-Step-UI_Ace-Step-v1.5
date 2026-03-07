@@ -17,6 +17,7 @@ interface TopBarProps {
 const NAV_ITEMS: { view: View; key: string }[] = [
   { view: 'create', key: 'nav.create' },
   { view: 'library', key: 'nav.library' },
+  { view: 'studio', key: 'nav.studio' },
   { view: 'training', key: 'nav.training' },
   { view: 'explore', key: 'nav.explore' },
   { view: 'gpu', key: 'nav.gpu' },

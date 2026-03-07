@@ -42,7 +42,7 @@
 
 /* ── Text selection ── */
 ::selection {
-  background-color: var(--color-brand-400);
+  background-color: #d946a8;
   color: #fff;
 }
 

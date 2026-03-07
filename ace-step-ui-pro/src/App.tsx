@@ -16,6 +16,7 @@ import MetadataModal from './components/ui/MetadataModal';
 import SongDetailPanel from './components/ui/SongDetailPanel';
 import StemSeparator from './components/ui/StemSeparator';
 import GpuMonitorView from './components/views/GpuMonitorView';
+import StudioView from './components/views/StudioView';
 import SettingsModal from './components/ui/SettingsModal';
 import Toast from './components/ui/Toast';
 
@@ -296,6 +297,8 @@ export default function App() {
     try {
       const res = await songsApi.toggleLike(songId, token);
       setSongs(prev => prev.map(s => s.id === songId ? { ...s, liked: res.liked } : s));
+      // Also update currentSong so PlayerBar heart stays in sync
+      setCurrentSong(prev => prev && prev.id === songId ? { ...prev, liked: res.liked } : prev);
     } catch { /* ignore */ }
   }, [token]);
 
@@ -471,6 +474,7 @@ export default function App() {
                 onMenuAction={handleMenuAction}
                 onSelectSong={setDetailSong}
                 onRenameSong={renameSong}
+                onLikeSong={toggleLike}
               />
             </div>
             {detailSong && (
@@ -496,6 +500,7 @@ export default function App() {
               onMenuAction={handleMenuAction}
               onSelectSong={setDetailSong}
               onRenameSong={renameSong}
+              onLikeSong={toggleLike}
             />
             {detailSong && (
               <SongDetailPanel
@@ -514,6 +519,8 @@ export default function App() {
         return <ExploreView onSelectStyle={handleSelectStyle} />;
       case 'gpu':
         return <GpuMonitorView />;
+      case 'studio':
+        return <StudioView />;
       default:
         return null;
     }
@@ -546,6 +553,7 @@ export default function App() {
         onSongEnd={playNext}
         isLiked={currentSong?.liked}
         onToggleLike={currentSong ? () => toggleLike(currentSong.id) : undefined}
+        onClickTitle={currentSong ? () => setDetailSong(currentSong) : undefined}
       />
 
       <FloatingAssistant isOpen={assistantOpen} onToggle={() => setAssistantOpen(v => !v)} />
