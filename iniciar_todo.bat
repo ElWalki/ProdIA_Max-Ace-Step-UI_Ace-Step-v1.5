@@ -170,15 +170,26 @@ REM  Flash attention se auto-detecta
 REM ═══════════════════════════════════════════════════════════
 echo.
 echo  [1/3] Iniciando / Starting ACE-Step Gradio API (puerto/port 8001)...
-echo        El modelo se inicializa automaticamente / Model initializes automatically.
-echo        Esto puede tardar / This may take 1-2 minutes the first time.
 
 start "ACE-Step Gradio API" cmd /s /k "title ACE-Step Gradio API && cd /d "%ACESTEP_DIR%" && set "ACESTEP_CACHE_DIR=%ACESTEP_DIR%.cache\acestep" && set "HF_HOME=%ACESTEP_DIR%.cache\huggingface" && "%PYTHON%" -m acestep.acestep_v15_pipeline --port 8001 --enable-api --backend pt --server-name 127.0.0.1 --config_path acestep-v15-turbo"
 
 REM ─── Esperar / Wait for Gradio ──────────────────────────────
 echo.
-echo  Esperando / Waiting for Gradio to start and load the model...
-echo  (comprobando / checking http://localhost:8001 every 5 seconds)
+echo ╔══════════════════════════════════════════════════════════════╗
+echo ║   CARGANDO EL MODELO DE IA / LOADING THE AI MODEL           ║
+echo ╠══════════════════════════════════════════════════════════════╣
+echo ║                                                              ║
+echo ║  ACE-Step necesita cargar varios GB de pesos del modelo     ║
+echo ║  en la GPU antes de poder generar musica.                   ║
+echo ║                                                              ║
+echo ║  Esto es NORMAL y ocurre siempre al iniciar:                ║
+echo ║    - Primera vez: puede tardar 2-5 minutos                  ║
+echo ║    - Usos siguientes: 1-2 minutos (cache caliente)          ║
+echo ║                                                              ║
+echo ║  Por favor, SE PACIENTE y no cierres esta ventana.          ║
+echo ║  Please be PATIENT and do not close this window.            ║
+echo ║                                                              ║
+echo ╚══════════════════════════════════════════════════════════════╝
 echo.
 
 set READY=0
@@ -204,15 +215,27 @@ if %errorlevel% equ 0 (
     )
 )
 
-REM Mostrar progreso
+REM Mostrar progreso con mensajes rotatorios segun tiempo transcurrido
 set /a SECS=%ATTEMPTS%*5
-echo    ... %SECS%s esperando / waiting (intento/attempt %ATTEMPTS%/%MAX_ATTEMPTS%)
+if %ATTEMPTS% leq 6 (
+    echo    [%SECS%s] Iniciando Python y cargando dependencias... / Starting Python and loading dependencies...
+) else if %ATTEMPTS% leq 12 (
+    echo    [%SECS%s] Cargando pesos del modelo DiT en GPU... / Loading DiT model weights into GPU...
+) else if %ATTEMPTS% leq 20 (
+    echo    [%SECS%s] Inicializando el backbone LM... / Initializing LM backbone... (esto es normal / this is normal)
+) else if %ATTEMPTS% leq 30 (
+    echo    [%SECS%s] Casi listo... el modelo es grande, espera un poco mas. / Almost there... model is large, hang tight.
+) else (
+    echo    [%SECS%s] Todavia cargando... GPU lenta o disco HDD? Sigue esperando. / Still loading... slow GPU or HDD? Keep waiting.
+)
 timeout /t 5 /nobreak >nul
 goto WAIT_GRADIO
 
 :GRADIO_READY
 echo.
-echo  ✓ Gradio API listo / ready! (modelo/model initialized)
+echo  ╔══════════════════════════════════════════════════════════════╗
+echo  ║  ✓  MODELO LISTO / MODEL READY!                             ║
+echo  ╚══════════════════════════════════════════════════════════════╝
 echo.
 
 :GRADIO_CONTINUE
