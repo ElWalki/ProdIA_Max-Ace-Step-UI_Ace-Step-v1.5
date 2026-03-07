@@ -35,9 +35,9 @@ lightning>=2.0.0
 
 # nano-vllm dependencies
 triton-windows>=3.0.0,<3.4; sys_platform == 'win32'
-triton>=3.0.0; sys_platform != 'win32'
+triton>=3.0.0; sys_platform != 'win32' and sys_platform != 'darwin'
 flash-attn @ https://github.com/sdbds/flash-attention-for-windows/releases/download/2.8.2/flash_attn-2.8.2+cu128torch2.7.1cxx11abiFALSEfullbackward-cp311-cp311-win_amd64.whl ; sys_platform == 'win32' and python_version == '3.11' and platform_machine == 'AMD64'
-flash-attn; sys_platform != 'win32'
+flash-attn; sys_platform != 'win32' and sys_platform != 'darwin'
 xxhash
 
 # Local package - install with: pip install -e acestep/third_parts/nano-vllm
