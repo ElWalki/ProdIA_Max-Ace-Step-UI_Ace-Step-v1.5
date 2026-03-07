@@ -109,22 +109,30 @@
 
 | Requirement | Minimum | Recommended |
 |-------------|---------|-------------|
-| OS | Windows 10 | Windows 11 |
+| OS | Windows 10 / Linux / macOS | Windows 11 |
 | GPU VRAM | 4 GB | 12 GB+ |
 | Python | 3.10 | 3.11 |
 | Node.js | 18 | 20 |
 | CUDA | — | 12.8 |
 
+> **Python dependencies** are defined in [`ACE-Step-1.5_/requirements.txt`](ACE-Step-1.5_/requirements.txt) (PyTorch, Transformers, Gradio, etc.).  
+> **Node.js dependencies** are managed via `package.json` in [`ace-step-ui/`](ace-step-ui/) (Express backend) and [`ace-step-ui-pro/`](ace-step-ui-pro/) (React frontend).  
+> All dependencies are installed automatically by `iniciar_todo.bat` (Windows) or `iniciar_todo.sh` (Linux/macOS) on first run.
+
 ---
 
-## ⚡ Quick Start / Inicio rápido (Windows)
+## ⚡ Quick Start / Inicio rápido
 
+**Windows:**
 ```bat
-REM 1. Setup (only first time / solo la primera vez)
-setup.bat
-
-REM 2. Launch everything / Lanzar todo
+REM Launch everything (installs deps on first run)
 iniciar_todo.bat
+```
+
+**Linux / macOS:**
+```bash
+chmod +x iniciar_todo.sh setup.sh
+./iniciar_todo.sh
 ```
 
 Open / Abre: **http://localhost:3000**
@@ -135,20 +143,73 @@ Open / Abre: **http://localhost:3000**
 
 ```
 ProdIA-MAX/
-├── ACE-Step-1.5_/          # ACE-Step 1.5 AI engine (original, MIT)
-├── ace-step-ui/             # Base UI fork from fspecii (original, MIT)
-├── IMAGES/                  # Screenshots & product images
-│   └── main.png             # Main product screenshot
-├── aplicar_captions_v3.py  # MAX: Auto-apply training captions
-├── detectar_bpm_clave.py   # MAX: BPM & key detection (librosa)
-├── transcribir_letras.py   # MAX: Lyric transcription (Whisper)
-├── truncar_captions.py     # MAX: Caption truncation helper
-├── check_genres.py         # MAX: Genre validator
-├── check_tensors.py        # MAX: Tensor/model inspector
-├── setup.bat               # Windows one-click setup
-├── iniciar_todo.bat        # Windows one-click launcher
-├── verificar_modelos.bat   # Model verification
-└── limpiar_datos_usuario.bat # Clean user data
+│
+├── ACE-Step-1.5_/              # ACE-Step 1.5 AI engine (original, MIT)
+│   ├── acestep/                #   Core Python inference code
+│   ├── requirements.txt        #   ★ Python dependencies (PyTorch, Gradio, etc.)
+│   └── ...
+│
+├── ace-step-ui/                # Base UI fork from fspecii (original, MIT)
+│   ├── server/                 #   Express + SQLite backend (Node.js)
+│   ├── package.json            #   Node.js dependencies (backend + frontend)
+│   └── ...
+│
+├── ace-step-ui-pro/            # ProdIA-MAX Pro UI (React 19 + Vite + Tailwind v4)
+│   ├── src/                    #   TypeScript source code
+│   │   ├── components/         #     React components (views, create, ui, layout)
+│   │   ├── services/           #     API clients, chord service, etc.
+│   │   ├── i18n.ts             #     Internationalization (EN/ES)
+│   │   └── App.tsx             #     Main application entry
+│   ├── package.json            #   Node.js dependencies (frontend)
+│   └── ...
+│
+├── i18n/                       # i18n utilities & locale files
+│   ├── locales/                #   Translation JSON files
+│   └── utils.py                #   i18n helper scripts
+│
+├── IMAGES/                     # Screenshots & product images
+│   └── main.png                #   Main product screenshot
+│
+├── SecurityScan/               # Security tools
+│   ├── escanear_seguridad.bat  #   Run security scan (Windows)
+│   ├── limpiar_kms.bat         #   KMS cleanup
+│   └── LEEME.md                #   Security scan documentation
+│
+├── backups/                    # Session backups
+│
+│── ★ MAX Production Tools ──────────────────────────────
+├── aplicar_captions_v3.py      # Auto-apply training captions
+├── detectar_bpm_clave.py       # BPM & key detection (librosa)
+├── transcribir_letras.py       # Lyric transcription (Whisper)
+├── transcribir_letras_v2.py    # Lyric transcription v2
+├── truncar_captions.py         # Caption truncation helper
+├── check_genres.py             # Genre validator
+├── check_tensors.py            # Tensor/model inspector
+│
+│── ★ Launchers (Windows) ───────────────────────────────
+├── iniciar_todo.bat            # One-click launcher (backend + frontend + AI)
+├── iniciar_pro.bat             # Launch Pro UI only
+├── verificar_modelos.bat       # Model verification
+├── limpiar_datos_usuario.bat   # Clean user data
+├── desinstalar.bat             # Uninstall / cleanup
+├── transcribir_letras.bat      # Transcribe lyrics launcher
+│
+│── ★ Launchers (Linux/macOS) ───────────────────────────
+├── setup.sh                    # First-time setup
+├── iniciar_todo.sh             # One-click launcher
+├── iniciar_pro.sh              # Launch Pro UI only
+├── iniciar_acestep_ui.sh       # Launch base UI
+├── verificar_modelos.sh        # Model verification
+├── limpiar_datos_usuario.sh    # Clean user data
+├── desinstalar.sh              # Uninstall / cleanup
+├── detectar_bpm_clave.sh       # BPM & key detection
+├── transcribir_letras.sh       # Transcribe lyrics
+│
+│── ★ Documentation ─────────────────────────────────────
+├── README.md                   # This file
+├── SINGER_LIBRARY_SPEC.md      # Singer library specification
+├── i18nHowTo.md                # i18n guide (English)
+└── i18nHowTo_es.md             # i18n guide (Spanish)
 ```
 
 ---
