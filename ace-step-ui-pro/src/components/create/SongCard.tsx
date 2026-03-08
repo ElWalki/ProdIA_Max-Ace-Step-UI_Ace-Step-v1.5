@@ -27,7 +27,7 @@ function avatarColor(name: string) {
   return colors[h % colors.length];
 }
 
-// Deterministic waveform bars from song ID
+// Deterministic waveform bars from song ID (fallback when audio not decoded yet)
 function generateBars(id: string, count: number): number[] {
   const bars: number[] = [];
   let seed = 0;
@@ -39,14 +39,45 @@ function generateBars(id: string, count: number): number[] {
   return bars;
 }
 
-/** Inline mini waveform – purple fill tracks playback progress */
-function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
+const BAR_COUNT = 200;
+
+/** Inline mini waveform – dense DAW-like bars, seekable via click/drag */
+function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
   songId: string; isPlaying: boolean; isCurrent: boolean;
   audioRef?: React.RefObject<HTMLAudioElement>;
+  audioUrl?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const barsRef = useRef<number[]>(generateBars(songId, 60));
+  const barsRef = useRef<number[]>(generateBars(songId, BAR_COUNT));
   const rafRef = useRef<number>(0);
+  const seekingRef = useRef(false);
+
+  // Decode real audio peaks
+  useEffect(() => {
+    if (!audioUrl) return;
+    let cancelled = false;
+    const ac = new AudioContext();
+    fetch(audioUrl)
+      .then(r => r.arrayBuffer())
+      .then(buf => ac.decodeAudioData(buf))
+      .then(decoded => {
+        if (cancelled) return;
+        const raw = decoded.getChannelData(0);
+        const step = Math.floor(raw.length / BAR_COUNT);
+        const p: number[] = [];
+        for (let i = 0; i < BAR_COUNT; i++) {
+          let max = 0;
+          for (let j = 0; j < step; j++) {
+            const v = Math.abs(raw[i * step + j]);
+            if (v > max) max = v;
+          }
+          p.push(max || 0.05);
+        }
+        barsRef.current = p;
+      })
+      .catch(() => {});
+    return () => { cancelled = true; ac.close().catch(() => {}); };
+  }, [audioUrl]);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -64,7 +95,7 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
       ctx.clearRect(0, 0, w, h);
 
       const bars = barsRef.current;
-      const gap = 1.5;
+      const gap = 0.5;
       const barW = (w - gap * (bars.length - 1)) / bars.length;
       let progress = 0;
       if (isCurrent && audioRef?.current) {
@@ -72,20 +103,18 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
         if (a.duration && isFinite(a.duration)) progress = a.currentTime / a.duration;
       }
 
+      const isLight = document.documentElement.classList.contains('light');
       bars.forEach((amp, i) => {
         const x = i * (barW + gap);
-        const barH = Math.max(1, amp * h);
+        const barH = Math.max(1, amp * h * 0.95);
         const y = (h - barH) / 2;
         const barProgress = (i + 0.5) / bars.length;
         if (isCurrent && barProgress <= progress) {
-          ctx.fillStyle = '#a855f7'; // purple for played portion
+          ctx.fillStyle = '#a855f7';
         } else {
-          const isLight = document.documentElement.classList.contains('light');
-          ctx.fillStyle = isLight ? '#b3b8cc' : '#3f3f4d'; // surface-300
+          ctx.fillStyle = isLight ? '#b3b8cc' : '#3f3f4d';
         }
-        ctx.beginPath();
-        ctx.roundRect(x, y, Math.max(1, barW), barH, 0.5);
-        ctx.fill();
+        ctx.fillRect(x, y, Math.max(0.5, barW), barH);
       });
 
       if (isCurrent && isPlaying) {
@@ -98,7 +127,6 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
       rafRef.current = requestAnimationFrame(draw);
     }
 
-    // Also listen to timeupdate for non-RAF updates
     const audio = audioRef?.current;
     const onTime = () => { if (!isPlaying) draw(); };
     audio?.addEventListener('timeupdate', onTime);
@@ -109,11 +137,37 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
     };
   }, [songId, isPlaying, isCurrent, audioRef]);
 
+  // Seek on click/drag
+  const handleSeekStart = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
+    if (!isCurrent || !audioRef?.current) return;
+    e.stopPropagation();
+    const canvas = canvasRef.current;
+    const audio = audioRef.current;
+    if (!canvas || !audio || !audio.duration) return;
+
+    seekingRef.current = true;
+    const seek = (clientX: number) => {
+      const rect = canvas.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      audio.currentTime = pct * audio.duration;
+    };
+    seek(e.clientX);
+
+    const onMove = (ev: MouseEvent) => { seek(ev.clientX); };
+    const onUp = () => {
+      seekingRef.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
+  }, [isCurrent, audioRef]);
+
   return (
     <canvas
       ref={canvasRef}
-      className="w-full h-5 rounded"
-      style={{ imageRendering: 'pixelated' }}
+      className={`w-full h-6 rounded ${isCurrent ? 'cursor-pointer' : 'cursor-default'}`}
+      onMouseDown={handleSeekStart}
     />
   );
 }
@@ -324,6 +378,7 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
               isPlaying={isPlaying}
               isCurrent={isCurrent}
               audioRef={audioRef}
+              audioUrl={song.audioUrl.startsWith('http') ? song.audioUrl : `/api/songs/${song.id}/audio`}
             />
           )}
 

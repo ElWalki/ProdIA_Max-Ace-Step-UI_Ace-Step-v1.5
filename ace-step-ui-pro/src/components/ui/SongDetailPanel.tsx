@@ -145,7 +145,7 @@ export default function SongDetailPanel({ song, onClose, onPlay, onDownload, onL
               </button>
             </div>
             <div
-              className={`text-xs text-surface-600 font-mono leading-relaxed bg-surface-100 rounded-lg p-2 border border-surface-200
+              className={`text-xs text-surface-700 font-mono font-medium leading-relaxed bg-surface-100 rounded-lg p-2 border border-surface-200
                 overflow-hidden transition-all ${expandLyrics ? 'max-h-[500px] overflow-y-auto' : 'max-h-24'}`}
               style={{ whiteSpace: 'pre-wrap' }}
             >
@@ -191,6 +191,72 @@ export default function SongDetailPanel({ song, onClose, onPlay, onDownload, onL
                 <div className="flex justify-between px-2.5 py-1.5">
                   <span className="text-surface-500">{t('meta.seed', 'Seed')}</span>
                   <span className="text-surface-800 font-medium font-mono">{gp.seed}</span>
+                </div>
+              )}
+              {gp.duration != null && gp.duration > 0 && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.duration', 'Duration')}</span>
+                  <span className="text-surface-800 font-medium">{gp.duration}s</span>
+                </div>
+              )}
+              {gp.timeSignature && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.timeSignature', 'Time Sig')}</span>
+                  <span className="text-surface-800 font-medium">{gp.timeSignature}</span>
+                </div>
+              )}
+              {gp.audioFormat && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.format', 'Format')}</span>
+                  <span className="text-surface-800 font-medium uppercase">{gp.audioFormat}</span>
+                </div>
+              )}
+              {gp.instrumental !== undefined && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.instrumental', 'Instrumental')}</span>
+                  <span className="text-surface-800 font-medium">{gp.instrumental ? 'Yes' : 'No'}</span>
+                </div>
+              )}
+              {gp.singer && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.singer', 'Singer')}</span>
+                  <span className="text-surface-800 font-medium truncate ml-2 max-w-[140px]">{gp.singer}</span>
+                </div>
+              )}
+              {gp.inferMethod && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.inferMethod', 'Method')}</span>
+                  <span className="text-surface-800 font-medium uppercase">{gp.inferMethod}</span>
+                </div>
+              )}
+              {gp.shift != null && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.shift', 'Shift')}</span>
+                  <span className="text-surface-800 font-medium">{gp.shift}</span>
+                </div>
+              )}
+              {gp.lmBackend && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.lmBackend', 'LM Backend')}</span>
+                  <span className="text-surface-800 font-medium truncate ml-2 max-w-[140px]">{gp.lmBackend}</span>
+                </div>
+              )}
+              {gp.lmTemperature != null && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.lmTemp', 'LM Temp')}</span>
+                  <span className="text-surface-800 font-medium">{gp.lmTemperature}</span>
+                </div>
+              )}
+              {gp.lmCfgScale != null && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.lmCfg', 'LM CFG')}</span>
+                  <span className="text-surface-800 font-medium">{gp.lmCfgScale}</span>
+                </div>
+              )}
+              {gp.loraName && (
+                <div className="flex justify-between px-2.5 py-1.5">
+                  <span className="text-surface-500">{t('meta.lora', 'LoRA')}</span>
+                  <span className="text-surface-800 font-medium truncate ml-2 max-w-[140px]">{gp.loraName}{gp.loraScale != null ? ` (${gp.loraScale})` : ''}</span>
                 </div>
               )}
             </div>

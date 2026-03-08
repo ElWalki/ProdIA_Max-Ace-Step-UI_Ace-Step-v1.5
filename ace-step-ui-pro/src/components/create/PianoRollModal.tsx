@@ -134,7 +134,21 @@ export default function PianoRollModal({ isOpen, onClose, onAddChord, engine, bp
 
   const handleClear = useCallback(() => { setPlacedNotes([]); setPlayCol(-1); }, []);
 
-  // Extend note duration by dragging right edge
+  // O(1) note lookup map: "midi-col" → PlacedNote (for notes starting at col)
+  // Also builds a set of covered cells: "midi-col" for cells under extended notes
+  const { noteMap, coveredSet } = useMemo(() => {
+    const map = new Map<string, PlacedNote>();
+    const covered = new Set<string>();
+    for (const n of placedNotes) {
+      map.set(`${n.midi}-${n.col}`, n);
+      for (let c = n.col + 1; c < n.col + n.duration; c++) {
+        covered.add(`${n.midi}-${c}`);
+      }
+    }
+    return { noteMap: map, coveredSet: covered };
+  }, [placedNotes]);
+
+  // Extend note duration by dragging right edge — rAF throttled
   const handleNoteResizeStart = useCallback((e: React.MouseEvent, noteId: string) => {
     e.stopPropagation();
     e.preventDefault();
@@ -144,13 +158,22 @@ export default function PianoRollModal({ isOpen, onClose, onAddChord, engine, bp
     const note = placedNotes.find(n => n.id === noteId);
     if (!note) return;
     const startDur = note.duration;
+    let lastDur = startDur;
+    let rafId = 0;
 
     const onMove = (ev: MouseEvent) => {
       const dx = ev.clientX - startX;
-      const newDur = Math.max(1, Math.min(gridCols - note.col, Math.round(startDur + dx / COL_WIDTH)));
-      setPlacedNotes(prev => prev.map(n => n.id === noteId ? { ...n, duration: newDur } : n));
+      const newDur = Math.max(1, Math.min(gridCols - note.col, Math.floor(startDur + dx / COL_WIDTH + 0.5)));
+      if (newDur !== lastDur) {
+        lastDur = newDur;
+        cancelAnimationFrame(rafId);
+        rafId = requestAnimationFrame(() => {
+          setPlacedNotes(prev => prev.map(n => n.id === noteId ? { ...n, duration: newDur } : n));
+        });
+      }
     };
     const onUp = () => {
+      cancelAnimationFrame(rafId);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
       setResizingNote(null);
@@ -329,12 +352,13 @@ export default function PianoRollModal({ isOpen, onClose, onAddChord, engine, bp
                     }`}
                   >
                     {Array.from({ length: gridCols }, (_, col) => {
-                      const note = placedNotes.find(n => n.midi === midi && n.col === col);
-                      const isCoveredBy = !note && placedNotes.find(n => n.midi === midi && n.col < col && n.col + n.duration > col);
+                      const cellKey = `${midi}-${col}`;
+                      const note = noteMap.get(cellKey);
+                      const isCovered = coveredSet.has(cellKey);
                       const isBeat = col % 4 === 0;
                       const isPlayingCol = playCol === col;
 
-                      if (isCoveredBy) {
+                      if (isCovered) {
                         // This cell is part of an extended note — don't render a clickable cell
                         return (
                           <div

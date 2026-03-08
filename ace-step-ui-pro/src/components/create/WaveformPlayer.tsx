@@ -33,7 +33,7 @@ export default function WaveformPlayer({
       .then(decoded => {
         if (cancelled) return;
         const raw = decoded.getChannelData(0);
-        const bars = 100;
+        const bars = 200;
         const step = Math.floor(raw.length / bars);
         const p: number[] = [];
         for (let i = 0; i < bars; i++) {
@@ -114,7 +114,7 @@ export default function WaveformPlayer({
     else { a.pause(); setIsPlaying(false); cancelAnimationFrame(animRef.current); }
   }, [tick]);
 
-  // Seek on click (non-region mode)
+  // Seek on click (non-region mode) — also allows drag-seek
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (dragging || regionMode) return;
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -125,18 +125,41 @@ export default function WaveformPlayer({
     setProgress(pct);
   }, [dragging, regionMode]);
 
-  // Region drag start
+  // Drag-to-seek for playback position (non-region mode)
   const handleMouseDown = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
-    if (!regionMode) return;
-    const rect = canvasRef.current?.getBoundingClientRect();
-    if (!rect) return;
-    const pct = (e.clientX - rect.left) / rect.width;
-    const ds = Math.abs(pct - regionStart);
-    const de = Math.abs(pct - regionEnd);
-    if (ds < 0.05 || de < 0.05) {
-      e.preventDefault();
-      setDragging(ds < de ? 'start' : 'end');
+    if (regionMode) {
+      // Region handle drag
+      const rect = canvasRef.current?.getBoundingClientRect();
+      if (!rect) return;
+      const pct = (e.clientX - rect.left) / rect.width;
+      const ds = Math.abs(pct - regionStart);
+      const de = Math.abs(pct - regionEnd);
+      if (ds < 0.05 || de < 0.05) {
+        e.preventDefault();
+        setDragging(ds < de ? 'start' : 'end');
+      }
+      return;
     }
+    // Non-region: drag-to-seek playback position
+    const rect = canvasRef.current?.getBoundingClientRect();
+    const a = audioRef.current;
+    if (!rect || !a || !a.duration) return;
+    e.preventDefault();
+
+    const seek = (clientX: number) => {
+      const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      a.currentTime = pct * a.duration;
+      setProgress(pct);
+    };
+    seek(e.clientX);
+
+    const onMove = (ev: MouseEvent) => { seek(ev.clientX); };
+    const onUp = () => {
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   }, [regionMode, regionStart, regionEnd]);
 
   // Region drag move/up

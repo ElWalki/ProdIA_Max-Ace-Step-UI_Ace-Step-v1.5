@@ -829,12 +829,17 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                     />
                     <button
                       onClick={saveTemplate}
-                      className="p-1.5 rounded-md bg-accent-500 text-white hover:bg-accent-400 transition-colors"
-                      title={t('create.saveTemplate', 'Save current settings')}
+                      className={`p-1.5 rounded-md text-white transition-colors ${
+                        savedTemplates.some(t => t.name === templateName.trim()) ? 'bg-amber-500 hover:bg-amber-400' : 'bg-accent-500 hover:bg-accent-400'
+                      }`}
+                      title={savedTemplates.some(t => t.name === templateName.trim()) ? t('create.overwriteTemplate', 'Overwrite existing template') : t('create.saveTemplate', 'Save current settings')}
                     >
                       <Save className="w-3 h-3" />
                     </button>
                   </div>
+                  {templateName.trim() && savedTemplates.some(t => t.name === templateName.trim()) && (
+                    <p className="text-[10px] text-amber-400 mt-1">{t('create.templateExists', 'Will overwrite existing template')}</p>
+                  )}
                 </div>
                 <div className="max-h-48 overflow-y-auto">
                   {savedTemplates.length === 0 ? (

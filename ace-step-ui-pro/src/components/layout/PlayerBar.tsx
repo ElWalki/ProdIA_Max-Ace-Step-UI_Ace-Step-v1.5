@@ -37,22 +37,29 @@ export default memo(function PlayerBar({
   const [shuffle, setShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
   const progressRef = useRef<HTMLDivElement>(null);
-  const lastUpdateRef = useRef<number>(0);
+  const animRef = useRef<number>(0);
+  const seekingRef = useRef(false);
 
+  // rAF-based playback progress loop (smooth 60fps)
   useEffect(() => {
     const audio = audioRef.current;
     if (!audio) return;
-    const onTime = () => {
-      const now = performance.now();
-      if (now - lastUpdateRef.current < 250) return;
-      lastUpdateRef.current = now;
-      if (audio.duration && isFinite(audio.duration)) {
+    let running = false;
+
+    const tick = () => {
+      if (audio.duration && isFinite(audio.duration) && !seekingRef.current) {
         setCurrentTime(audio.currentTime);
         setDuration(audio.duration);
         setProgress((audio.currentTime / audio.duration) * 100);
       }
+      if (running) animRef.current = requestAnimationFrame(tick);
     };
+
+    const onPlay = () => { running = true; animRef.current = requestAnimationFrame(tick); };
+    const onPause = () => { running = false; cancelAnimationFrame(animRef.current); tick(); };
     const onEnded = () => {
+      running = false;
+      cancelAnimationFrame(animRef.current);
       if (repeatMode === 'one') {
         audio.currentTime = 0;
         audio.play();
@@ -60,11 +67,24 @@ export default memo(function PlayerBar({
         onSongEnd();
       }
     };
-    audio.addEventListener('timeupdate', onTime);
+    const onMeta = () => {
+      if (audio.duration && isFinite(audio.duration)) setDuration(audio.duration);
+    };
+
+    // Start loop if already playing
+    if (!audio.paused) onPlay();
+
+    audio.addEventListener('play', onPlay);
+    audio.addEventListener('pause', onPause);
     audio.addEventListener('ended', onEnded);
+    audio.addEventListener('loadedmetadata', onMeta);
     return () => {
-      audio.removeEventListener('timeupdate', onTime);
+      running = false;
+      cancelAnimationFrame(animRef.current);
+      audio.removeEventListener('play', onPlay);
+      audio.removeEventListener('pause', onPause);
       audio.removeEventListener('ended', onEnded);
+      audio.removeEventListener('loadedmetadata', onMeta);
     };
   }, [audioRef, onSongEnd, repeatMode]);
 
@@ -82,6 +102,38 @@ export default memo(function PlayerBar({
     const rect = bar.getBoundingClientRect();
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     audio.currentTime = pct * audio.duration;
+    setProgress(pct * 100);
+    setCurrentTime(pct * audio.duration);
+  }, [audioRef]);
+
+  // Drag-to-seek: mousedown on progress bar → track mousemove → mouseup
+  const handleSeekMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const bar = progressRef.current;
+    const audio = audioRef.current;
+    if (!bar || !audio || !audio.duration) return;
+    e.preventDefault();
+    seekingRef.current = true;
+
+    const updateSeek = (clientX: number) => {
+      const rect = bar.getBoundingClientRect();
+      const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
+      audio.currentTime = pct * audio.duration;
+      setProgress(pct * 100);
+      setCurrentTime(pct * audio.duration);
+    };
+
+    updateSeek(e.clientX);
+
+    const onMove = (ev: MouseEvent) => {
+      updateSeek(ev.clientX);
+    };
+    const onUp = () => {
+      seekingRef.current = false;
+      document.removeEventListener('mousemove', onMove);
+      document.removeEventListener('mouseup', onUp);
+    };
+    document.addEventListener('mousemove', onMove);
+    document.addEventListener('mouseup', onUp);
   }, [audioRef]);
 
   const handleDownload = useCallback(() => {
@@ -110,7 +162,7 @@ export default memo(function PlayerBar({
       <div
         ref={progressRef}
         className="h-1 bg-surface-200 cursor-pointer group relative"
-        onClick={handleSeek}
+        onMouseDown={handleSeekMouseDown}
       >
         <div
           className="h-full bg-gradient-to-r from-accent-500 to-brand-500"

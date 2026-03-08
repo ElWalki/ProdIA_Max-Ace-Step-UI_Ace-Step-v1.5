@@ -1,4 +1,4 @@
-import React, { useState } from 'react';
+import React, { useState, useRef, useCallback } from 'react';
 import { HelpCircle } from 'lucide-react';
 
 interface SliderFieldProps {
@@ -17,6 +17,30 @@ export default function SliderField({ label, value, onChange, min, max, step = 1
   const [isEditing, setIsEditing] = useState(false);
   const [editValue, setEditValue] = useState('');
   const [showTip, setShowTip] = useState(false);
+  const [localValue, setLocalValue] = useState(value);
+  const isDragging = useRef(false);
+  const rafRef = useRef(0);
+
+  // Sync external value when not dragging
+  if (!isDragging.current && localValue !== value) {
+    setLocalValue(value);
+  }
+
+  const handleSliderChange = useCallback((e: React.ChangeEvent<HTMLInputElement>) => {
+    const v = parseFloat(e.target.value);
+    setLocalValue(v);
+    isDragging.current = true;
+    cancelAnimationFrame(rafRef.current);
+    rafRef.current = requestAnimationFrame(() => {
+      onChange(v);
+    });
+  }, [onChange]);
+
+  const handleSliderEnd = useCallback(() => {
+    isDragging.current = false;
+    cancelAnimationFrame(rafRef.current);
+    onChange(localValue);
+  }, [onChange, localValue]);
 
   const handleDoubleClick = () => {
     setEditValue(String(value));
@@ -55,8 +79,10 @@ export default function SliderField({ label, value, onChange, min, max, step = 1
         min={min}
         max={max}
         step={step}
-        value={value}
-        onChange={e => onChange(parseFloat(e.target.value))}
+        value={localValue}
+        onChange={handleSliderChange}
+        onMouseUp={handleSliderEnd}
+        onTouchEnd={handleSliderEnd}
         disabled={disabled}
         className="flex-1 h-1"
       />
@@ -76,7 +102,7 @@ export default function SliderField({ label, value, onChange, min, max, step = 1
           className="w-16 text-xs text-right text-surface-700 cursor-pointer tabular-nums shrink-0"
           title="Double-click to edit"
         >
-          {step < 1 ? value.toFixed(2) : value}{suffix || ''}
+          {step < 1 ? localValue.toFixed(2) : localValue}{suffix || ''}
         </span>
       )}
     </div>

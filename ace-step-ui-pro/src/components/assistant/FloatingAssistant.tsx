@@ -135,7 +135,7 @@ function renderMarkdownBlock(text: string): React.ReactNode {
       // Inline code
       const codeMatch = remaining.match(/^`([^`]+)`/);
       if (codeMatch) {
-        parts.push(<code key={key++} className="px-1.5 py-0.5 rounded bg-[#2a2a4a] text-accent-300 text-[12px] font-mono">{codeMatch[1]}</code>);
+        parts.push(<code key={key++} className="px-1.5 py-0.5 rounded bg-surface-300 text-accent-300 text-[12px] font-mono">{codeMatch[1]}</code>);
         remaining = remaining.slice(codeMatch[0].length);
         continue;
       }
@@ -149,22 +149,22 @@ function renderMarkdownBlock(text: string): React.ReactNode {
       // Italic
       const italicMatch = remaining.match(/^\*(.+?)\*/);
       if (italicMatch) {
-        parts.push(<em key={key++} className="italic text-[#c8c8e0]">{italicMatch[1]}</em>);
+        parts.push(<em key={key++} className="italic text-surface-700">{italicMatch[1]}</em>);
         remaining = remaining.slice(italicMatch[0].length);
         continue;
       }
       // Plain text - take until next special char
       const nextSpecial = remaining.search(/[`*\[]/);
       if (nextSpecial === -1) {
-        parts.push(<span key={key++} className="text-[#e0e0ee]">{remaining}</span>);
+        parts.push(<span key={key++} className="text-surface-900">{remaining}</span>);
         break;
       }
       if (nextSpecial === 0) {
         // No match, just take one char
-        parts.push(<span key={key++} className="text-[#e0e0ee]">{remaining[0]}</span>);
+        parts.push(<span key={key++} className="text-surface-900">{remaining[0]}</span>);
         remaining = remaining.slice(1);
       } else {
-        parts.push(<span key={key++} className="text-[#e0e0ee]">{remaining.slice(0, nextSpecial)}</span>);
+        parts.push(<span key={key++} className="text-surface-900">{remaining.slice(0, nextSpecial)}</span>);
         remaining = remaining.slice(nextSpecial);
       }
     }
@@ -184,13 +184,13 @@ function renderMarkdownBlock(text: string): React.ReactNode {
       } else {
         inCodeBlock = false;
         elements.push(
-          <div key={i} className="my-2 rounded-lg overflow-hidden border border-[#333]">
+          <div key={i} className="my-2 rounded-lg overflow-hidden border border-surface-300">
             {codeBlockLang && (
-              <div className="px-3 py-1 bg-[#1a1a2e] text-[10px] text-[#888] font-mono border-b border-[#333]">
+              <div className="px-3 py-1 bg-surface-100 text-[10px] text-surface-500 font-mono border-b border-surface-300">
                 {codeBlockLang}
               </div>
             )}
-            <pre className="px-3 py-2 bg-[#12122a] text-[12px] text-[#ddd] font-mono overflow-x-auto leading-relaxed">
+            <pre className="px-3 py-2 bg-surface-50 text-[12px] text-surface-800 font-mono overflow-x-auto leading-relaxed">
               {codeLines.join('\n')}
             </pre>
           </div>
@@ -213,17 +213,17 @@ function renderMarkdownBlock(text: string): React.ReactNode {
     // Headings
     const h3Match = line.match(/^###\s+(.+)/);
     if (h3Match) {
-      elements.push(<h4 key={i} className="text-[13px] font-bold text-white mt-2 mb-1">{processInline(h3Match[1])}</h4>);
+      elements.push(<h4 key={i} className="text-[13px] font-bold text-surface-900 mt-2 mb-1">{processInline(h3Match[1])}</h4>);
       continue;
     }
     const h2Match = line.match(/^##\s+(.+)/);
     if (h2Match) {
-      elements.push(<h3 key={i} className="text-sm font-bold text-white mt-2 mb-1">{processInline(h2Match[1])}</h3>);
+      elements.push(<h3 key={i} className="text-sm font-bold text-surface-900 mt-2 mb-1">{processInline(h2Match[1])}</h3>);
       continue;
     }
     const h1Match = line.match(/^#\s+(.+)/);
     if (h1Match) {
-      elements.push(<h2 key={i} className="text-[15px] font-bold text-white mt-2 mb-1">{processInline(h1Match[1])}</h2>);
+      elements.push(<h2 key={i} className="text-[15px] font-bold text-surface-900 mt-2 mb-1">{processInline(h1Match[1])}</h2>);
       continue;
     }
 
@@ -232,7 +232,7 @@ function renderMarkdownBlock(text: string): React.ReactNode {
     if (bulletMatch) {
       const indent = Math.min(Math.floor(bulletMatch[1].length / 2), 3);
       elements.push(
-        <div key={i} className="flex gap-1.5 text-[13px] text-[#e0e0ee] leading-relaxed" style={{ paddingLeft: indent * 16 }}>
+        <div key={i} className="flex gap-1.5 text-[13px] text-surface-900 leading-relaxed" style={{ paddingLeft: indent * 16 }}>
           <span className="text-accent-400 shrink-0 mt-0.5">•</span>
           <span>{processInline(bulletMatch[2])}</span>
         </div>
@@ -244,7 +244,7 @@ function renderMarkdownBlock(text: string): React.ReactNode {
     const numMatch = line.match(/^(\s*)\d+\.\s+(.+)/);
     if (numMatch) {
       elements.push(
-        <div key={i} className="flex gap-1.5 text-[13px] text-[#e0e0ee] leading-relaxed">
+        <div key={i} className="flex gap-1.5 text-[13px] text-surface-900 leading-relaxed">
           <span>{processInline(numMatch[2])}</span>
         </div>
       );
@@ -253,7 +253,7 @@ function renderMarkdownBlock(text: string): React.ReactNode {
 
     // Regular paragraph
     elements.push(
-      <p key={i} className="text-[13px] text-[#e0e0ee] leading-relaxed">{processInline(line)}</p>
+      <p key={i} className="text-[13px] text-surface-900 leading-relaxed">{processInline(line)}</p>
     );
   }
 
@@ -744,52 +744,52 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
       ref={panelRef}
       style={{ left: pos.x, top: pos.y, width: 420, height: 600 }}
       className="fixed z-50 flex flex-col rounded-2xl overflow-hidden
-        bg-[#0d0d1a]/95 backdrop-blur-xl
-        border border-[#333]/60 shadow-2xl shadow-black/60
+        bg-surface-50/95 backdrop-blur-xl
+        border border-surface-400/60 shadow-2xl shadow-black/60
         animate-scale-in"
     >
       {/* ━━ Header ━━ */}
       <div
         className="flex items-center gap-2.5 px-4 py-3
-          bg-[#111125]/90 border-b border-[#333]/40
+          bg-surface-100/90 border-b border-surface-400/40
           cursor-grab active:cursor-grabbing select-none"
         onPointerDown={onPointerDown}
         onPointerMove={onPointerMove}
         onPointerUp={onPointerUp}
       >
-        <GripVertical className="w-3.5 h-3.5 text-[#555]" />
+        <GripVertical className="w-3.5 h-3.5 text-surface-500" />
         <div className="w-8 h-8 rounded-xl bg-gradient-to-br from-accent-500 to-brand-500
           flex items-center justify-center shadow-md shadow-accent-500/20">
           <Disc3 className="w-4 h-4 text-white" />
         </div>
         <div className="flex-1 min-w-0">
-          <span className="text-sm font-bold text-white block leading-tight">{t('assistant.title')}</span>
-          <span className="text-[10px] text-[#888] leading-tight">
+          <span className="text-sm font-bold text-surface-900 block leading-tight">{t('assistant.title')}</span>
+          <span className="text-[10px] text-surface-500 leading-tight">
             {activeProvider
               ? `${activeProvider.name} — ${activeProvider.selectedModel || 'default'}`
               : t('assistant.offlineMode')}
           </span>
         </div>
         <button onClick={handleClear}
-          className="p-1.5 rounded-lg text-[#666] hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
+          className="p-1.5 rounded-lg text-surface-500 hover:text-amber-400 hover:bg-amber-500/10 transition-colors"
           title={t('assistant.clearHistory')}>
           <RotateCcw className="w-3.5 h-3.5" />
         </button>
         <button
           onClick={() => setKeepAlive(v => !v)}
           className={`p-1.5 rounded-lg transition-colors ${
-            keepAlive ? 'text-green-400 bg-green-500/15 hover:bg-green-500/25' : 'text-[#666] hover:text-[#999] hover:bg-[#333]'
+            keepAlive ? 'text-green-400 bg-green-500/15 hover:bg-green-500/25' : 'text-surface-500 hover:text-surface-700 hover:bg-surface-300'
           }`}
           title={t('vram.keepInMemory')}
         >
           <Brain className="w-3.5 h-3.5" />
         </button>
         <button onClick={() => setMinimized(true)}
-          className="p-1.5 rounded-lg text-[#666] hover:text-white hover:bg-[#333] transition-colors">
+          className="p-1.5 rounded-lg text-surface-500 hover:text-surface-900 hover:bg-surface-300 transition-colors">
           <Minus className="w-3.5 h-3.5" />
         </button>
         <button onClick={() => setOpen(false)}
-          className="p-1.5 rounded-lg text-[#666] hover:text-red-400 hover:bg-red-500/10 transition-colors">
+          className="p-1.5 rounded-lg text-surface-500 hover:text-red-400 hover:bg-red-500/10 transition-colors">
           <X className="w-3.5 h-3.5" />
         </button>
       </div>
@@ -814,7 +814,7 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
               <div className={`px-3.5 py-2.5 rounded-2xl ${
                 msg.role === 'user'
                   ? 'bg-accent-600 text-white rounded-tr-md text-[13px] leading-relaxed'
-                  : 'bg-[#16162e] text-[#e0e0e0] rounded-tl-md border border-[#2a2a4a]'
+                  : 'bg-surface-150 text-surface-800 rounded-tl-md border border-surface-300'
               }`}>
                 {msg.role === 'assistant'
                   ? renderMarkdown(msg.content)
@@ -829,14 +829,14 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
                 msg.role === 'user' ? 'justify-end' : 'justify-start'
               }`}>
                 {msg.timestamp && (
-                  <span className="text-[10px] text-[#555]">
+                  <span className="text-[10px] text-surface-400">
                     {new Date(msg.timestamp).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })}
                   </span>
                 )}
                 {msg.role === 'assistant' && !msg.streaming && (
                   <button
                     onClick={() => handleCopy(msg.content, i)}
-                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-[#555] hover:text-white transition-all"
+                    className="opacity-0 group-hover:opacity-100 p-0.5 rounded text-surface-400 hover:text-surface-900 transition-all"
                   >
                     {copiedIdx === i
                       ? <Check className="w-3 h-3 text-green-400" />
@@ -852,7 +852,7 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
             <div className="w-7 h-7 rounded-lg bg-gradient-to-br from-accent-600/20 to-brand-500/20 flex items-center justify-center">
               <Bot className="w-3.5 h-3.5 text-brand-400" />
             </div>
-            <div className="bg-[#16162e] text-[#888] px-4 py-3 rounded-2xl rounded-tl-md border border-[#2a2a4a]">
+            <div className="bg-surface-150 text-surface-500 px-4 py-3 rounded-2xl rounded-tl-md border border-surface-300">
               <div className="flex gap-1.5">
                 <span className="w-2 h-2 rounded-full bg-accent-400 animate-bounce" style={{ animationDelay: '0ms' }} />
                 <span className="w-2 h-2 rounded-full bg-accent-400 animate-bounce" style={{ animationDelay: '150ms' }} />
@@ -865,15 +865,15 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
       </div>
 
       {/* ━━ Quick Actions ━━ */}
-      <div className="flex items-center gap-1.5 px-4 py-1.5 border-t border-[#222]">
+      <div className="flex items-center gap-1.5 px-4 py-1.5 border-t border-surface-300">
         {quickActions.map((action, i) => (
           <button
             key={i}
             onClick={() => handleSend(action.prompt)}
             disabled={loading}
             className="flex items-center gap-1 px-2 py-1 rounded-lg
-              bg-[#1a1a30] border border-[#2a2a4a]
-              text-[10px] font-medium text-[#ccc]
+              bg-surface-150 border border-surface-300
+              text-[10px] font-medium text-surface-700
               hover:text-accent-300 hover:border-accent-500/40 hover:bg-accent-500/10
               disabled:opacity-40 transition-all whitespace-nowrap"
           >
@@ -903,9 +903,9 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
             }}
             placeholder={t('assistant.placeholder')}
             rows={1}
-            className="w-full bg-[#111125] text-[14px] text-white placeholder:text-[#555]
+            className="w-full bg-surface-100 text-[14px] text-surface-900 placeholder:text-surface-400
               outline-none resize-none leading-relaxed max-h-[150px]
-              rounded-xl border border-[#333] px-4 py-3 pr-12
+              rounded-xl border border-surface-300 px-4 py-3 pr-12
               focus:border-accent-500/60 focus:shadow-[0_0_0_2px_rgba(99,102,241,0.15)]
               transition-all"
           />
@@ -914,7 +914,7 @@ export default function FloatingAssistant({ isOpen: externalOpen, onToggle }: Fl
             disabled={!input.trim() || loading}
             className="absolute right-2.5 bottom-2.5 w-8 h-8 rounded-lg flex items-center justify-center
               bg-accent-500 text-white
-              disabled:opacity-20 disabled:bg-[#333]
+              disabled:opacity-20 disabled:bg-surface-300
               hover:bg-accent-400 active:scale-95 transition-all"
           >
             <Send className="w-4 h-4" />

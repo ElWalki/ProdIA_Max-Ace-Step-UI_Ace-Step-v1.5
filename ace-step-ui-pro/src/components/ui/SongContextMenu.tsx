@@ -68,6 +68,7 @@ export default function SongContextMenu({ x, y, onClose, onAction, isOwner = tru
     { key: 'viewConfig', icon: <Settings2 className="w-4 h-4" />, label: t('common.viewConfig') },
     { key: 'editMetadata', icon: <Pencil className="w-4 h-4" />, label: t('common.editMetadata'), hidden: !isOwner },
     { key: 'download', icon: <Download className="w-4 h-4" />, label: t('common.download'), hidden: !hasAudioUrl },
+    { key: 'downloadWav', icon: <FileAudio className="w-4 h-4" />, label: t('common.downloadWav', 'Download as WAV'), hidden: !hasAudioUrl },
     { key: 'share', icon: <Share2 className="w-4 h-4" />, label: t('common.share'), divider: true },
     { key: 'delete', icon: <Trash2 className="w-4 h-4" />, label: t('common.delete'), danger: true, hidden: !isOwner },
   ];

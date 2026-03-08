@@ -222,7 +222,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
     try {
       const ffmpeg = new FFmpeg();
 
-      ffmpeg.on('progress', ({ progress }) => {
+      ffmpeg.on('progress', ({ progress }: { progress: number }) => {
         if (exportStage === 'encoding') {
           setExportProgress(Math.round(progress * 100));
         }

@@ -37,7 +37,9 @@ export default function App() {
   const { user, token, isLoading, needsLogin } = useAuth();
 
   // ─── View ───
-  const [currentView, setCurrentView] = useState<View>('create');
+  const [currentView, setCurrentView] = useState<View>(() => {
+    return (localStorage.getItem('acestep_view') as View) || 'create';
+  });
 
   // ─── Songs ───
   const [songs, setSongs] = useState<Song[]>([]);
@@ -63,7 +65,10 @@ export default function App() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [profileOpen, setProfileOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
-  const [panelWidth, setPanelWidth] = useState(420);
+  const [panelWidth, setPanelWidth] = useState(() => {
+    const saved = localStorage.getItem('acestep_panel_width');
+    return saved ? Math.max(300, Math.min(700, Number(saved))) : 420;
+  });
   const [isDraggingPanel, setIsDraggingPanel] = useState(false);
   const [theme, setTheme] = useState<'dark' | 'light'>(() => {
     return (localStorage.getItem('acestep_theme') as 'dark' | 'light') || 'dark';
@@ -75,6 +80,10 @@ export default function App() {
     document.documentElement.classList.toggle('light', theme === 'light');
     localStorage.setItem('acestep_theme', theme);
   }, [theme]);
+
+  // ─── Persist view & panel width ───
+  useEffect(() => { localStorage.setItem('acestep_view', currentView); }, [currentView]);
+  useEffect(() => { localStorage.setItem('acestep_panel_width', String(panelWidth)); }, [panelWidth]);
 
   // ─── Audio setup ───
   useEffect(() => {
@@ -384,6 +393,51 @@ export default function App() {
           a.click();
         }
         break;
+      case 'downloadWav':
+        if (song.audioUrl) {
+          const wavUrl = song.audioUrl.startsWith('http') ? song.audioUrl : `/api/songs/${song.id}/audio`;
+          fetch(wavUrl)
+            .then(r => r.arrayBuffer())
+            .then(buf => new AudioContext().decodeAudioData(buf))
+            .then(decoded => {
+              const numCh = decoded.numberOfChannels;
+              const sampleRate = decoded.sampleRate;
+              const length = decoded.length;
+              const wavBuf = new ArrayBuffer(44 + length * numCh * 2);
+              const view = new DataView(wavBuf);
+              const writeStr = (o: number, s: string) => { for (let i = 0; i < s.length; i++) view.setUint8(o + i, s.charCodeAt(i)); };
+              writeStr(0, 'RIFF');
+              view.setUint32(4, 36 + length * numCh * 2, true);
+              writeStr(8, 'WAVE');
+              writeStr(12, 'fmt ');
+              view.setUint32(16, 16, true);
+              view.setUint16(20, 1, true);
+              view.setUint16(22, numCh, true);
+              view.setUint32(24, sampleRate, true);
+              view.setUint32(28, sampleRate * numCh * 2, true);
+              view.setUint16(32, numCh * 2, true);
+              view.setUint16(34, 16, true);
+              writeStr(36, 'data');
+              view.setUint32(40, length * numCh * 2, true);
+              const channels = Array.from({ length: numCh }, (_, i) => decoded.getChannelData(i));
+              let offset = 44;
+              for (let i = 0; i < length; i++) {
+                for (let ch = 0; ch < numCh; ch++) {
+                  const s = Math.max(-1, Math.min(1, channels[ch][i]));
+                  view.setInt16(offset, s < 0 ? s * 0x8000 : s * 0x7FFF, true);
+                  offset += 2;
+                }
+              }
+              const blob = new Blob([wavBuf], { type: 'audio/wav' });
+              const a = document.createElement('a');
+              a.href = URL.createObjectURL(blob);
+              a.download = `${song.title || 'song'}.wav`;
+              a.click();
+              URL.revokeObjectURL(a.href);
+            })
+            .catch(() => showToast(t('common.downloadError', 'Failed to export WAV'), 'error'));
+        }
+        break;
       case 'share':
         if (navigator.share && song.audioUrl) {
           navigator.share({ title: song.title, url: song.audioUrl }).catch(() => {});
@@ -549,7 +603,7 @@ export default function App() {
   }
 
   return (
-    <div className="h-screen flex flex-col bg-surface-0 text-surface-900 overflow-hidden">
+    <div className="h-screen flex flex-col bg-surface-0 text-surface-900 overflow-hidden musical-bg">
       <TopBar
         currentView={currentView}
         onNavigate={setCurrentView}
