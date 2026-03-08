@@ -344,7 +344,7 @@ export default memo(function PlayerBar({
             boxShadow: '0 -4px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05)',
           }}
         >
-          {/* ── Seekable glow trail at top edge ── */}
+          {/* ── Seekable glow trail at top edge (gradient fade + scaleX like lalals.ai) ── */}
           <div
             ref={glowRef}
             className="absolute -top-[3px] left-4 right-4 h-[14px] cursor-pointer z-10 group"
@@ -357,19 +357,48 @@ export default memo(function PlayerBar({
           >
             {/* Track background (widens on hover for easier targeting) */}
             <div className="absolute inset-x-0 top-[5px] h-[2px] rounded-full bg-white/8 group-hover:h-[3px] group-hover:top-[4.5px] group-hover:bg-white/15 transition-[height,top,background-color] duration-200" />
-            {/* Filled progress with animated glow */}
+
+            {/* Filled progress: scaleX + gradient transparent→solid (tapers from left) */}
+            <span
+              className={`absolute left-0 top-[5px] block h-[2px] w-full origin-left will-change-transform group-hover:h-[3px] group-hover:top-[4.5px] transition-[height,top] duration-200 ${isPlaying ? 'pb-glow-anim' : 'pb-glow-idle'}`}
+              style={{ transform: `scaleX(${progress / 100})`, color: 'var(--color-accent-400)' }}
+            >
+              {/* Blur glow layers (outer aura) */}
+              <div
+                className="absolute inset-0 h-full w-full"
+                style={{ opacity: isPlaying ? 1 : 0.5, filter: `brightness(${isPlaying ? 1 : 0.7})`, transition: 'opacity 0.3s' }}
+              >
+                <span
+                  className="absolute inset-0 h-full w-full blur-[6px]"
+                  style={{ background: 'linear-gradient(90deg, transparent 0%, var(--color-accent-500) 100%)' }}
+                />
+                <span
+                  className="absolute inset-0 h-full w-full blur-[4px]"
+                  style={{ background: 'linear-gradient(90deg, transparent 0%, var(--color-brand-400) 100%)' }}
+                />
+              </div>
+              {/* Solid core line */}
+              <span
+                className="absolute inset-0 block h-full w-full"
+                style={{ background: 'linear-gradient(90deg, transparent 0%, var(--color-accent-400) 100%)' }}
+              />
+            </span>
+
+            {/* Playback-position dot (only appears on hover) */}
             <div
-              className={`absolute top-[5px] left-0 h-[2px] rounded-full group-hover:h-[3px] group-hover:top-[4.5px] transition-[height,top] duration-200 ${isPlaying ? 'pb-glow-anim' : 'pb-glow-idle'}`}
-              style={{
-                width: `${progress}%`,
-                background: 'linear-gradient(90deg, var(--color-accent-500), var(--color-brand-400))',
-                boxShadow: isPlaying
-                  ? '0 0 6px var(--color-accent-500), 0 0 14px var(--color-brand-500), 0 0 24px var(--color-accent-400)'
-                  : '0 0 4px var(--color-accent-500)',
-                color: 'var(--color-accent-400)',
-              }}
-            />
-            {/* Time droplet tooltip (appears on hover) */}
+              className="pointer-events-none absolute top-[5px] left-0 w-full will-change-transform group-hover:top-[4.5px] transition-[top] duration-200"
+              style={{ transform: `translateX(${progress}%)` }}
+            >
+              <span
+                className="absolute -top-[3.5px] left-0 block h-[9px] w-[9px] -translate-x-1/2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                style={{
+                  background: 'var(--color-accent-400)',
+                  boxShadow: '0 0 8px var(--color-accent-500)',
+                }}
+              />
+            </div>
+
+            {/* Time droplet tooltip (appears on hover at cursor position) */}
             {hoverPct !== null && (
               <div
                 className="absolute pointer-events-none"
