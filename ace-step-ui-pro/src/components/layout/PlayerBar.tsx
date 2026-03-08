@@ -23,6 +23,17 @@ if (typeof document !== 'undefined' && !document.getElementById(glowStyleId)) {
     }
     .pb-glow-anim { animation: pb-shimmer 4s ease-in-out infinite; }
     .pb-glow-idle  { filter: brightness(0.7); animation: none; }
+    @keyframes pb-spark {
+      0%   { transform: translate(-50%,-50%) scale(0); opacity: 1; }
+      60%  { opacity: 0.8; }
+      100% { transform: translate(-50%,-50%) scale(1); opacity: 0; }
+    }
+    .pb-particle {
+      position: absolute;
+      border-radius: 50%;
+      pointer-events: none;
+      animation: pb-spark 0.6s ease-out forwards;
+    }
   `;
   document.head.appendChild(style);
 }
@@ -63,9 +74,12 @@ export default memo(function PlayerBar({
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
   const [expanded, setExpanded] = useState(false);
   const [hoverPct, setHoverPct] = useState<number | null>(null);
+  const [isDragging, setIsDragging] = useState(false);
   const glowRef = useRef<HTMLDivElement>(null);
+  const particleLayerRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
   const seekingRef = useRef(false);
+  const lastSparkTime = useRef(0);
   const isPlayingRef = useRef(isPlaying);
   useEffect(() => { isPlayingRef.current = isPlaying; }, [isPlaying]);
 
@@ -132,6 +146,42 @@ export default memo(function PlayerBar({
     localStorage.setItem('ace_volume', String(volume));
   }, [volume, isMuted, audioRef]);
 
+  // Spawn a sparkle particle at the seek position
+  const spawnParticle = useCallback((pct: number) => {
+    const layer = particleLayerRef.current;
+    if (!layer) return;
+    const now = performance.now();
+    if (now - lastSparkTime.current < 40) return; // throttle: max 1 every 40ms
+    lastSparkTime.current = now;
+    const count = 2 + Math.floor(Math.random() * 2); // 2-3 particles
+    for (let i = 0; i < count; i++) {
+      const dot = document.createElement('span');
+      dot.className = 'pb-particle';
+      const size = 2 + Math.random() * 4;
+      const angle = Math.random() * Math.PI * 2;
+      const dist = 4 + Math.random() * 10;
+      const tx = Math.cos(angle) * dist;
+      const ty = Math.sin(angle) * dist;
+      dot.style.cssText = `
+        left:${pct}%;top:50%;width:${size}px;height:${size}px;
+        background:var(--color-accent-400);
+        box-shadow:0 0 ${size + 2}px var(--color-accent-500);
+        animation-duration:${0.4 + Math.random() * 0.4}s;
+        --tx:${tx}px;--ty:${ty}px;
+      `;
+      // Override animation to include random direction
+      dot.style.animation = 'none';
+      dot.offsetHeight; // force reflow
+      dot.style.animation = '';
+      dot.animate([
+        { transform: 'translate(-50%,-50%) scale(0)', opacity: 1 },
+        { transform: `translate(calc(-50% + ${tx}px), calc(-50% + ${ty}px)) scale(1)`, opacity: 0 }
+      ], { duration: 400 + Math.random() * 300, easing: 'ease-out', fill: 'forwards' });
+      layer.appendChild(dot);
+      setTimeout(() => dot.remove(), 800);
+    }
+  }, []);
+
   // Drag-to-seek on the TOP GLOW BAR
   const handleGlowSeekDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
     const bar = glowRef.current;
@@ -140,6 +190,7 @@ export default memo(function PlayerBar({
     e.preventDefault();
     e.stopPropagation();
     seekingRef.current = true;
+    setIsDragging(true);
 
     const updateSeek = (clientX: number) => {
       const rect = bar.getBoundingClientRect();
@@ -147,6 +198,7 @@ export default memo(function PlayerBar({
       audio.currentTime = pct * audio.duration;
       setProgress(pct * 100);
       setCurrentTime(pct * audio.duration);
+      spawnParticle(pct * 100);
     };
 
     updateSeek(e.clientX);
@@ -154,12 +206,13 @@ export default memo(function PlayerBar({
     const onMove = (ev: MouseEvent) => updateSeek(ev.clientX);
     const onUp = () => {
       seekingRef.current = false;
+      setIsDragging(false);
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
     document.addEventListener('mousemove', onMove);
     document.addEventListener('mouseup', onUp);
-  }, [audioRef]);
+  }, [audioRef, spawnParticle]);
 
   const handleDownload = useCallback(() => {
     if (!song?.audioUrl) return;
@@ -355,50 +408,53 @@ export default memo(function PlayerBar({
             }}
             onMouseLeave={() => setHoverPct(null)}
           >
-            {/* Track background (widens on hover for easier targeting) */}
-            <div className="absolute inset-x-0 top-[5px] h-[2px] rounded-full bg-white/8 group-hover:h-[3px] group-hover:top-[4.5px] group-hover:bg-white/15 transition-[height,top,background-color] duration-200" />
+            {/* Track background */}
+            <div className="absolute inset-x-0 top-[5px] h-[1.5px] rounded-full bg-white/6 group-hover:h-[2.5px] group-hover:top-[4.5px] group-hover:bg-white/12 transition-[height,top,background-color] duration-200" />
 
-            {/* Filled progress: scaleX + gradient transparent→solid (tapers from left) */}
+            {/* Filled progress: scaleX + gradient transparent→solid (tapers from left, extra fade in first 30%) */}
             <span
-              className={`absolute left-0 top-[5px] block h-[2px] w-full origin-left will-change-transform group-hover:h-[3px] group-hover:top-[4.5px] transition-[height,top] duration-200 ${isPlaying ? 'pb-glow-anim' : 'pb-glow-idle'}`}
+              className={`absolute left-0 top-[5px] block h-[1.5px] w-full origin-left will-change-transform group-hover:h-[2.5px] group-hover:top-[4.5px] transition-[height,top] duration-200 ${isPlaying ? 'pb-glow-anim' : 'pb-glow-idle'}`}
               style={{ transform: `scaleX(${progress / 100})`, color: 'var(--color-accent-400)' }}
             >
-              {/* Blur glow layers (outer aura) */}
+              {/* Blur glow layers (outer aura) — fade through more of the line */}
               <div
                 className="absolute inset-0 h-full w-full"
-                style={{ opacity: isPlaying ? 1 : 0.5, filter: `brightness(${isPlaying ? 1 : 0.7})`, transition: 'opacity 0.3s' }}
+                style={{ opacity: isPlaying ? 1 : 0.4, filter: `brightness(${isPlaying ? 1 : 0.6})`, transition: 'opacity 0.3s' }}
               >
                 <span
-                  className="absolute inset-0 h-full w-full blur-[6px]"
-                  style={{ background: 'linear-gradient(90deg, transparent 0%, var(--color-accent-500) 100%)' }}
+                  className="absolute inset-0 h-full w-full blur-[5px]"
+                  style={{ background: 'linear-gradient(90deg, transparent 0%, transparent 20%, var(--color-accent-500) 100%)' }}
                 />
                 <span
-                  className="absolute inset-0 h-full w-full blur-[4px]"
-                  style={{ background: 'linear-gradient(90deg, transparent 0%, var(--color-brand-400) 100%)' }}
+                  className="absolute inset-0 h-full w-full blur-[3px]"
+                  style={{ background: 'linear-gradient(90deg, transparent 0%, transparent 30%, var(--color-brand-400) 100%)' }}
                 />
               </div>
-              {/* Solid core line */}
+              {/* Solid core line — subtle start, builds up */}
               <span
-                className="absolute inset-0 block h-full w-full"
-                style={{ background: 'linear-gradient(90deg, transparent 0%, var(--color-accent-400) 100%)' }}
+                className="absolute inset-0 block h-full w-full rounded-full"
+                style={{ background: 'linear-gradient(90deg, transparent 0%, rgba(255,255,255,0.08) 15%, var(--color-accent-400) 100%)' }}
               />
             </span>
 
-            {/* Playback-position dot (only appears on hover) */}
+            {/* Playback-position dot (only on hover / drag) */}
             <div
               className="pointer-events-none absolute top-[5px] left-0 w-full will-change-transform group-hover:top-[4.5px] transition-[top] duration-200"
               style={{ transform: `translateX(${progress}%)` }}
             >
               <span
-                className="absolute -top-[3.5px] left-0 block h-[9px] w-[9px] -translate-x-1/2 rounded-full opacity-0 group-hover:opacity-100 transition-opacity duration-300"
+                className={`absolute -top-[3px] left-0 block h-[7px] w-[7px] -translate-x-1/2 rounded-full transition-opacity duration-200 ${isDragging ? 'opacity-100 scale-110' : 'opacity-0 group-hover:opacity-100'}`}
                 style={{
-                  background: 'var(--color-accent-400)',
-                  boxShadow: '0 0 8px var(--color-accent-500)',
+                  background: 'var(--color-accent-300)',
+                  boxShadow: `0 0 6px var(--color-accent-500)${isDragging ? ', 0 0 14px var(--color-brand-400)' : ''}`,
                 }}
               />
             </div>
 
-            {/* Time droplet tooltip (appears on hover at cursor position) */}
+            {/* Particle layer (sparkles spawn here when dragging) */}
+            <div ref={particleLayerRef} className="absolute inset-0 pointer-events-none overflow-visible" />
+
+            {/* Time droplet tooltip (appears on hover / drag at cursor position) */}
             {hoverPct !== null && (
               <div
                 className="absolute pointer-events-none"
