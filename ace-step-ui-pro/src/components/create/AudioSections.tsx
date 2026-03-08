@@ -297,6 +297,10 @@ export default function AudioSections(props: AudioSectionsProps) {
             onUpload={props.onExtendUpload}
             onClear={props.onExtendClear}
             onSongDrop={props.onExtendSongDrop}
+            regionMode
+            regionStart={props.repaintingStart}
+            regionEnd={props.repaintingEnd}
+            onRegionChange={props.onRepaintingChange}
             audioHistory={props.audioHistory}
             onHistorySelect={item => props.onHistorySelect?.(item, 'source')}
           />

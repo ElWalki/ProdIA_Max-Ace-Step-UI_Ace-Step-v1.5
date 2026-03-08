@@ -1136,9 +1136,8 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
     drawParticles(ctx, width, height, time, bass, currentConfig.particleCount, currentConfig.primaryColor);
 
     if (['NCS Circle', 'Hexagon', 'Orbital', 'Shockwave'].includes(currentConfig.preset)) {
-        const rawAlbumArtUrl = customAlbumArt || song.coverUrl;
-        // Proxy external URLs to avoid CORS issues in fallback
-        const albumArtUrl = rawAlbumArtUrl.startsWith('http')
+        const rawAlbumArtUrl = customAlbumArt || song.coverUrl || '';
+        const albumArtUrl = rawAlbumArtUrl && rawAlbumArtUrl.startsWith('http')
             ? `/api/proxy/image?url=${encodeURIComponent(rawAlbumArtUrl)}`
             : rawAlbumArtUrl;
         drawAlbumArt(ctx, centerX, centerY, pulse, albumArtUrl, currentConfig.primaryColor, customAlbumArtImageRef.current);
