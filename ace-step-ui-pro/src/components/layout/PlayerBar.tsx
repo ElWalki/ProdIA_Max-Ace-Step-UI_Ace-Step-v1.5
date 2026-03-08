@@ -356,10 +356,10 @@ export default memo(function PlayerBar({
             onMouseLeave={() => setHoverPct(null)}
           >
             {/* Track background (widens on hover for easier targeting) */}
-            <div className="absolute inset-x-0 top-[5px] h-[2px] rounded-full bg-white/8 group-hover:h-[3px] group-hover:top-[4.5px] group-hover:bg-white/15 transition-all duration-200" />
+            <div className="absolute inset-x-0 top-[5px] h-[2px] rounded-full bg-white/8 group-hover:h-[3px] group-hover:top-[4.5px] group-hover:bg-white/15 transition-[height,top,background-color] duration-200" />
             {/* Filled progress with animated glow */}
             <div
-              className={`absolute top-[5px] left-0 h-[2px] rounded-full group-hover:h-[3px] group-hover:top-[4.5px] transition-all duration-200 ${isPlaying ? 'pb-glow-anim' : 'pb-glow-idle'}`}
+              className={`absolute top-[5px] left-0 h-[2px] rounded-full group-hover:h-[3px] group-hover:top-[4.5px] transition-[height,top] duration-200 ${isPlaying ? 'pb-glow-anim' : 'pb-glow-idle'}`}
               style={{
                 width: `${progress}%`,
                 background: 'linear-gradient(90deg, var(--color-accent-500), var(--color-brand-400))',
