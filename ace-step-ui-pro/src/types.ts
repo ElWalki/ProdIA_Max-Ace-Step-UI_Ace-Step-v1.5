@@ -43,6 +43,47 @@ export const DEFAULT_STYLE_DNA: StyleDna = {
   complexity: 50,
 };
 
+// Per-section-tag cadence settings
+export interface TagCadence {
+  tag: string;           // e.g. '[Verse]'
+  wordsPerLine: number;  // target words per line (0 = auto)
+  density: 'sparse' | 'normal' | 'dense' | 'rapid';
+  mood?: string;         // optional mood override per section
+}
+
+export const DENSITY_LABELS = {
+  sparse: { en: 'Sparse', es: 'Disperso', wordsRange: '2-4' },
+  normal: { en: 'Normal', es: 'Normal', wordsRange: '5-8' },
+  dense:  { en: 'Dense',  es: 'Denso',  wordsRange: '8-12' },
+  rapid:  { en: 'Rapid',  es: 'Rápido', wordsRange: '12+' },
+} as const;
+
+export const DEFAULT_TAG_CADENCES: Record<string, TagCadence> = {
+  '[Intro]':      { tag: '[Intro]',      wordsPerLine: 4,  density: 'sparse' },
+  '[Verse]':      { tag: '[Verse]',      wordsPerLine: 8,  density: 'normal' },
+  '[Pre-Chorus]': { tag: '[Pre-Chorus]', wordsPerLine: 7,  density: 'normal' },
+  '[Chorus]':     { tag: '[Chorus]',     wordsPerLine: 6,  density: 'dense' },
+  '[Bridge]':     { tag: '[Bridge]',     wordsPerLine: 6,  density: 'normal' },
+  '[Outro]':      { tag: '[Outro]',      wordsPerLine: 4,  density: 'sparse' },
+  '[Rap]':        { tag: '[Rap]',        wordsPerLine: 12, density: 'rapid' },
+  '[Break]':      { tag: '[Break]',      wordsPerLine: 0,  density: 'sparse' },
+};
+
+// Build cadence hints to inject into lyrics as hidden guidance
+export function buildTagCadenceHints(cadences: Record<string, TagCadence>): string {
+  const hints: string[] = [];
+  for (const [tag, c] of Object.entries(cadences)) {
+    const parts: string[] = [];
+    if (c.wordsPerLine > 0) parts.push(`~${c.wordsPerLine} words/line`);
+    if (c.density !== 'normal') parts.push(`${c.density} delivery`);
+    if (c.mood) parts.push(c.mood);
+    if (parts.length > 0) {
+      hints.push(`${tag}: ${parts.join(', ')}`);
+    }
+  }
+  return hints.join('; ');
+}
+
 // Maps StyleDna slider values to descriptive tags injected into caption
 export function buildStyleDnaTags(dna: StyleDna): string {
   if (!dna.enabled) return '';

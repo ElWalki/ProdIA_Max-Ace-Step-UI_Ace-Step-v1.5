@@ -20,7 +20,23 @@ export default function WaveformPlayer({
   const [progress, setProgress] = useState(0);
   const [duration, setDuration] = useState(0);
   const animRef = useRef(0);
+  const activeRef = useRef(false);
   const [dragging, setDragging] = useState<'start' | 'end' | null>(null);
+
+  // Mutable refs to avoid stale closures in the draw loop
+  const progressRef = useRef(progress);
+  progressRef.current = progress;
+  const regionStartRef = useRef(regionStart);
+  regionStartRef.current = regionStart;
+  const regionEndRef = useRef(regionEnd);
+  regionEndRef.current = regionEnd;
+  const regionModeRef = useRef(regionMode);
+  regionModeRef.current = regionMode;
+  const peaksRef = useRef(peaks);
+  peaksRef.current = peaks;
+
+  // Canvas dimensions — stored to avoid layout thrashing in draw
+  const canvasSizeRef = useRef({ w: 0, h: 0 });
 
   // Decode audio to extract peaks
   useEffect(() => {
@@ -50,21 +66,49 @@ export default function WaveformPlayer({
     return () => { cancelled = true; ac.close().catch(() => {}); };
   }, [src]);
 
-  // Draw waveform — professional DAW-style mirrored bars
+  // Sync canvas resolution with element size via ResizeObserver
   useEffect(() => {
     const canvas = canvasRef.current;
-    if (!canvas || !peaks || peaks.length === 0) return;
+    if (!canvas) return;
+    const dpr = window.devicePixelRatio || 1;
+    const syncSize = () => {
+      const rect = canvas.getBoundingClientRect();
+      const w = Math.round(rect.width);
+      const h = Math.round(rect.height);
+      if (w !== canvasSizeRef.current.w || h !== canvasSizeRef.current.h) {
+        canvas.width = w * dpr;
+        canvas.height = h * dpr;
+        canvasSizeRef.current = { w, h };
+      }
+    };
+    syncSize();
+    const ro = new ResizeObserver(syncSize);
+    ro.observe(canvas);
+    return () => ro.disconnect();
+  }, []);
+
+  // Pure draw function — reads from refs, no state dependencies
+  const draw = useCallback(() => {
+    const canvas = canvasRef.current;
+    const pk = peaksRef.current;
+    if (!canvas || !pk || pk.length === 0) return;
     const c = canvas.getContext('2d');
     if (!c) return;
+
     const dpr = window.devicePixelRatio || 1;
-    const { width: w, height: h } = canvas.getBoundingClientRect();
-    canvas.width = w * dpr;
-    canvas.height = h * dpr;
-    c.scale(dpr, dpr);
+    const { w, h } = canvasSizeRef.current;
+    if (w === 0 || h === 0) return;
+
+    c.setTransform(dpr, 0, 0, dpr, 0, 0);
     c.clearRect(0, 0, w, h);
 
+    const prog = progressRef.current;
+    const rStart = regionStartRef.current;
+    const rEnd = regionEndRef.current;
+    const rMode = regionModeRef.current;
+
     const gap = 1;
-    const barW = Math.max(1, (w - gap * (peaks.length - 1)) / peaks.length);
+    const barW = Math.max(1, (w - gap * (pk.length - 1)) / pk.length);
     const midY = h / 2;
     const maxHalf = h * 0.44;
     const isLight = document.documentElement.classList.contains('light');
@@ -72,9 +116,9 @@ export default function WaveformPlayer({
     const r = Math.min(barW * 0.4, 1.5);
 
     // Region highlight background
-    if (regionMode) {
+    if (rMode) {
       c.fillStyle = isLight ? 'rgba(99,102,241,0.06)' : 'rgba(139,92,246,0.06)';
-      c.fillRect(regionStart * w, 0, (regionEnd - regionStart) * w, h);
+      c.fillRect(rStart * w, 0, (rEnd - rStart) * w, h);
     }
 
     // Center reference line
@@ -88,14 +132,14 @@ export default function WaveformPlayer({
     const mutedColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)';
 
     // Mirrored bars
-    for (let i = 0; i < peaks.length; i++) {
+    for (let i = 0; i < pk.length; i++) {
       const x = i * (barW + gap);
-      const halfH = Math.max(0.5, peaks[i] * maxHalf);
-      const pct = (i + 0.5) / peaks.length;
+      const halfH = Math.max(0.5, pk[i] * maxHalf);
+      const pct = (i + 0.5) / pk.length;
 
-      if (regionMode && pct >= regionStart && pct <= regionEnd) {
-        c.fillStyle = pct <= progress ? regionActiveColor : regionColor;
-      } else if (progress > 0 && pct <= progress) {
+      if (rMode && pct >= rStart && pct <= rEnd) {
+        c.fillStyle = pct <= prog ? regionActiveColor : regionColor;
+      } else if (prog > 0 && pct <= prog) {
         c.fillStyle = playedColor;
       } else {
         c.fillStyle = mutedColor;
@@ -115,15 +159,15 @@ export default function WaveformPlayer({
     }
 
     // Playhead
-    if (progress > 0) {
-      const px = progress * w;
+    if (prog > 0) {
+      const px = prog * w;
       c.fillStyle = isLight ? 'rgba(99,102,241,0.9)' : 'rgba(255,255,255,0.6)';
       c.fillRect(Math.round(px) - 0.5, 0, 1, h);
     }
 
     // Region handles
-    if (regionMode) {
-      for (const pos of [regionStart, regionEnd]) {
+    if (rMode) {
+      for (const pos of [rStart, rEnd]) {
         const x = pos * w;
         c.fillStyle = isLight ? 'rgba(99,102,241,0.85)' : 'rgba(168,85,247,0.85)';
         c.fillRect(x - 1, 0, 2, h);
@@ -132,25 +176,45 @@ export default function WaveformPlayer({
         c.fill();
       }
     }
-  }, [peaks, progress, regionMode, regionStart, regionEnd]);
-
-  // Playback animation
-  const tick = useCallback(() => {
-    const a = audioRef.current;
-    if (a && !a.paused) {
-      setProgress(a.currentTime / (a.duration || 1));
-      animRef.current = requestAnimationFrame(tick);
-    }
   }, []);
+
+  // rAF loop — separate from draw, guarded by activeRef
+  useEffect(() => {
+    if (!peaks || peaks.length === 0) return;
+    activeRef.current = true;
+
+    const loop = () => {
+      if (!activeRef.current) return;
+      const a = audioRef.current;
+      if (a && !a.paused) {
+        progressRef.current = a.currentTime / (a.duration || 1);
+        setProgress(progressRef.current);
+      }
+      draw();
+      animRef.current = requestAnimationFrame(loop);
+    };
+
+    // Initial draw + start loop
+    draw();
+    animRef.current = requestAnimationFrame(loop);
+
+    return () => {
+      activeRef.current = false;
+      cancelAnimationFrame(animRef.current);
+    };
+  }, [peaks, draw]);
+
+  // Redraw on region changes (when not playing, loop may still be running)
+  useEffect(() => { draw(); }, [regionStart, regionEnd, regionMode, draw]);
 
   const togglePlay = useCallback(() => {
     const a = audioRef.current;
     if (!a) return;
-    if (a.paused) { a.play(); setIsPlaying(true); animRef.current = requestAnimationFrame(tick); }
-    else { a.pause(); setIsPlaying(false); cancelAnimationFrame(animRef.current); }
-  }, [tick]);
+    if (a.paused) { a.play(); setIsPlaying(true); }
+    else { a.pause(); setIsPlaying(false); }
+  }, []);
 
-  // Seek on click (non-region mode) — also allows drag-seek
+  // Seek on click (non-region mode)
   const handleClick = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
     if (dragging || regionMode) return;
     const rect = canvasRef.current?.getBoundingClientRect();
@@ -159,6 +223,7 @@ export default function WaveformPlayer({
     const pct = Math.max(0, Math.min(1, (e.clientX - rect.left) / rect.width));
     a.currentTime = pct * (a.duration || 0);
     setProgress(pct);
+    progressRef.current = pct;
   }, [dragging, regionMode]);
 
   // Drag-to-seek for playback position (non-region mode)
@@ -186,6 +251,7 @@ export default function WaveformPlayer({
       const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
       a.currentTime = pct * a.duration;
       setProgress(pct);
+      progressRef.current = pct;
     };
     seek(e.clientX);
 
@@ -220,7 +286,7 @@ export default function WaveformPlayer({
     <div className="space-y-1">
       <audio ref={audioRef} src={src} preload="metadata"
         onLoadedMetadata={() => setDuration(audioRef.current?.duration || 0)}
-        onEnded={() => { setIsPlaying(false); setProgress(0); }}
+        onEnded={() => { setIsPlaying(false); setProgress(0); progressRef.current = 0; }}
       />
       <div className="flex items-center gap-2">
         <button onClick={togglePlay}

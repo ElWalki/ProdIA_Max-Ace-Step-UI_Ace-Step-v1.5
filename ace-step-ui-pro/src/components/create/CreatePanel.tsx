@@ -18,6 +18,7 @@ import {
   KEY_SIGNATURES, TIME_SIGNATURES, VOCAL_LANGUAGES,
   ChordProgressionState,
   StyleDna, DEFAULT_STYLE_DNA, buildStyleDnaTags, styleDnaToModelParams,
+  TagCadence, DEFAULT_TAG_CADENCES, buildTagCadenceHints,
 } from '../../types';
 import { generateApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -41,6 +42,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
     lm: false, audio: false, expert: false,
   });
   const [styleDna, setStyleDna] = useState<StyleDna>({ ...DEFAULT_STYLE_DNA });
+  const [tagCadences, setTagCadences] = useState<Record<string, TagCadence>>({ ...DEFAULT_TAG_CADENCES });
   const [isEnhancing, setIsEnhancing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const srcFileInputRef = useRef<HTMLInputElement>(null);
@@ -351,6 +353,22 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
             : dnaTags;
         }
       }
+
+      // Tag cadence hints — inject section delivery guidance into style
+      const cadenceHints = buildTagCadenceHints(tagCadences);
+      if (cadenceHints) {
+        const cadenceTag = `[cadence: ${cadenceHints}]`;
+        if (finalParams.customMode) {
+          finalParams.style = finalParams.style
+            ? `${finalParams.style}, ${cadenceTag}`
+            : cadenceTag;
+        } else {
+          finalParams.songDescription = finalParams.songDescription
+            ? `${finalParams.songDescription}, ${cadenceTag}`
+            : cadenceTag;
+        }
+      }
+
       // Apply model-level param overrides from DNA
       const modelOverrides = styleDnaToModelParams(styleDna);
       if (modelOverrides.lmRepetitionPenalty !== undefined) {
@@ -377,7 +395,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
     }
 
     onGenerate(finalParams);
-  }, [isGenerating, activeJobCount, onGenerate, params, styleDna]);
+  }, [isGenerating, activeJobCount, onGenerate, params, styleDna, tagCadences]);
 
   const handleRandomDescription = async () => {
     if (!token) return;
@@ -1096,7 +1114,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                   ref={lyricsRef}
                   disabled={params.instrumental}
                   style={coloredLyrics && params.lyrics && !params.instrumental ? { lineHeight: '1.5', color: 'transparent', caretColor: 'var(--color-surface-900)' } : { lineHeight: '1.5' }}
-                  className={`relative w-full bg-surface-100 border border-surface-300 rounded-md px-2 py-1.5 text-surface-900 placeholder:text-surface-400 min-h-[100px] max-h-[500px] font-mono text-xs no-scrollbar ${
+                  className={`relative w-full bg-surface-100 border border-surface-300 rounded-md px-2 py-1.5 text-surface-900 placeholder:text-surface-400 min-h-[100px] max-h-[800px] font-mono text-xs no-scrollbar ${
                     params.instrumental ? 'opacity-40 cursor-not-allowed' : ''
                   }`}
                 />
@@ -1124,7 +1142,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                     const startY = e.clientY;
                     const startH = textarea.offsetHeight;
                     const onMove = (ev: MouseEvent) => {
-                      const newH = Math.max(100, Math.min(500, startH + ev.clientY - startY));
+                      const newH = Math.max(100, Math.min(800, startH + ev.clientY - startY));
                       textarea.style.height = `${newH}px`;
                     };
                     const onUp = () => {
@@ -1288,6 +1306,8 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
               isOpen={openSections.styleDna ?? false}
               onToggle={() => toggleSection('styleDna')}
               lyrics={params.lyrics}
+              tagCadences={tagCadences}
+              onTagCadencesChange={setTagCadences}
             />
 
             {/* LoRA */}
