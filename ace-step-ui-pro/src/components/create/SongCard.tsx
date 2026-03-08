@@ -39,45 +39,17 @@ function generateBars(id: string, count: number): number[] {
   return bars;
 }
 
-const BAR_COUNT = 160;
+const BAR_COUNT = 120;
 
 /** Inline mini waveform – professional DAW-style mirrored bars, seekable via click/drag */
-function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
+function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
   songId: string; isPlaying: boolean; isCurrent: boolean;
   audioRef?: React.RefObject<HTMLAudioElement>;
-  audioUrl?: string;
 }) {
   const canvasRef = useRef<HTMLCanvasElement>(null);
-  const barsRef = useRef<number[]>(generateBars(songId, BAR_COUNT));
+  const bars = useMemo(() => generateBars(songId, BAR_COUNT), [songId]);
   const rafRef = useRef<number>(0);
-  const seekingRef = useRef(false);
-
-  // Decode real audio peaks
-  useEffect(() => {
-    if (!audioUrl) return;
-    let cancelled = false;
-    const ac = new AudioContext();
-    fetch(audioUrl)
-      .then(r => r.arrayBuffer())
-      .then(buf => ac.decodeAudioData(buf))
-      .then(decoded => {
-        if (cancelled) return;
-        const raw = decoded.getChannelData(0);
-        const step = Math.floor(raw.length / BAR_COUNT);
-        const p: number[] = [];
-        for (let i = 0; i < BAR_COUNT; i++) {
-          let max = 0;
-          for (let j = 0; j < step; j++) {
-            const v = Math.abs(raw[i * step + j]);
-            if (v > max) max = v;
-          }
-          p.push(max || 0.05);
-        }
-        barsRef.current = p;
-      })
-      .catch(() => {});
-    return () => { cancelled = true; ac.close().catch(() => {}); };
-  }, [audioUrl]);
+  const activeRef = useRef(false);
 
   useEffect(() => {
     const canvas = canvasRef.current;
@@ -88,19 +60,17 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
     const draw = () => {
       const w = canvas.offsetWidth;
       const h = canvas.offsetHeight;
+      if (!w || !h) return;
       const dpr = window.devicePixelRatio || 1;
       canvas.width = w * dpr;
       canvas.height = h * dpr;
       ctx.scale(dpr, dpr);
-      ctx.clearRect(0, 0, w, h);
 
-      const bars = barsRef.current;
       const gap = 1;
       const barW = Math.max(1, (w - gap * (bars.length - 1)) / bars.length);
       const midY = h / 2;
       const maxHalf = h * 0.44;
 
-      // Progress — show position even when paused if this is the current song
       let progress = 0;
       if (isCurrent && audioRef?.current) {
         const a = audioRef.current;
@@ -108,29 +78,26 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
       }
 
       const isLight = document.documentElement.classList.contains('light');
-      const hasRoundRect = typeof ctx.roundRect === 'function';
+      const playedColor = isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,92,246,0.85)';
+      const mutedColor = isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.1)';
+      const hasRR = typeof ctx.roundRect === 'function';
+      const r = Math.min(barW * 0.4, 1.5);
 
       // Center reference line
-      ctx.fillStyle = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)';
+      ctx.fillStyle = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.025)';
       ctx.fillRect(0, midY, w, 0.5);
 
       // Mirrored bars
-      const playedColor = isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,92,246,0.85)';
-      const mutedColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)';
-      const r = Math.min(barW * 0.4, 1.5);
-
-      bars.forEach((amp, i) => {
+      for (let i = 0; i < bars.length; i++) {
         const x = i * (barW + gap);
-        const halfH = Math.max(0.5, amp * maxHalf);
-        const barPct = (i + 0.5) / bars.length;
-        ctx.fillStyle = (isCurrent && progress > 0 && barPct <= progress) ? playedColor : mutedColor;
+        const halfH = Math.max(0.5, bars[i] * maxHalf);
+        const pct = (i + 0.5) / bars.length;
+        ctx.fillStyle = (isCurrent && progress > 0 && pct <= progress) ? playedColor : mutedColor;
 
-        if (hasRoundRect) {
-          // Upper half — rounded top
+        if (hasRR) {
           ctx.beginPath();
           ctx.roundRect(x, midY - halfH, barW, halfH, [r, r, 0, 0]);
           ctx.fill();
-          // Lower half — rounded bottom
           ctx.beginPath();
           ctx.roundRect(x, midY, barW, halfH, [0, 0, r, r]);
           ctx.fill();
@@ -138,34 +105,41 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
           ctx.fillRect(x, midY - halfH, barW, halfH);
           ctx.fillRect(x, midY, barW, halfH);
         }
-      });
-
-      // Playhead line
-      if (isCurrent && progress > 0) {
-        const px = progress * w;
-        ctx.fillStyle = isLight ? 'rgba(99,102,241,0.9)' : 'rgba(255,255,255,0.6)';
-        ctx.fillRect(Math.round(px) - 0.5, 0, 1, h);
       }
 
-      if (isPlaying) {
-        rafRef.current = requestAnimationFrame(draw);
+      // Playhead
+      if (isCurrent && progress > 0) {
+        const px = progress * w;
+        ctx.fillStyle = isLight ? 'rgba(99,102,241,0.9)' : 'rgba(255,255,255,0.55)';
+        ctx.fillRect(Math.round(px) - 0.5, 0, 1, h);
       }
     };
 
+    // Initial draw
     draw();
+
+    // rAF loop — guarded by mutable ref so cleanup always stops it
+    activeRef.current = isPlaying;
     if (isPlaying) {
-      rafRef.current = requestAnimationFrame(draw);
+      const loop = () => {
+        if (!activeRef.current) return;
+        draw();
+        rafRef.current = requestAnimationFrame(loop);
+      };
+      rafRef.current = requestAnimationFrame(loop);
     }
 
+    // Redraw on timeupdate when paused but current (shows seek position)
     const audio = audioRef?.current;
-    const onTime = () => { if (isCurrent) draw(); };
+    const onTime = () => { if (isCurrent && !activeRef.current) draw(); };
     audio?.addEventListener('timeupdate', onTime);
 
     return () => {
+      activeRef.current = false;
       cancelAnimationFrame(rafRef.current);
       audio?.removeEventListener('timeupdate', onTime);
     };
-  }, [songId, isPlaying, isCurrent, audioRef]);
+  }, [songId, isPlaying, isCurrent, audioRef, bars]);
 
   // Seek on click/drag
   const handleSeekStart = useCallback((e: React.MouseEvent<HTMLCanvasElement>) => {
@@ -175,7 +149,6 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
     const audio = audioRef.current;
     if (!canvas || !audio || !audio.duration) return;
 
-    seekingRef.current = true;
     const seek = (clientX: number) => {
       const rect = canvas.getBoundingClientRect();
       const pct = Math.max(0, Math.min(1, (clientX - rect.left) / rect.width));
@@ -185,7 +158,6 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
 
     const onMove = (ev: MouseEvent) => { seek(ev.clientX); };
     const onUp = () => {
-      seekingRef.current = false;
       document.removeEventListener('mousemove', onMove);
       document.removeEventListener('mouseup', onUp);
     };
@@ -408,7 +380,6 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
               isPlaying={isPlaying}
               isCurrent={isCurrent}
               audioRef={audioRef}
-              audioUrl={song.audioUrl.startsWith('http') ? song.audioUrl : `/api/songs/${song.id}/audio`}
             />
           )}
 
