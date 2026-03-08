@@ -867,7 +867,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
       throw new Error('FFmpeg produced an empty output file');
     }
 
-    const blob = new Blob([outputData], { type: 'video/mp4' });
+    const blob = new Blob([outputData as Uint8Array], { type: 'video/mp4' });
     const url = URL.createObjectURL(blob);
     console.log('[Video] Created blob URL:', url, 'Size:', blob.size);
 
@@ -1686,10 +1686,10 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
   return (
     <div className="fixed inset-0 z-[60] flex items-center justify-center bg-black/90 backdrop-blur-md p-0 md:p-4 animate-in fade-in duration-200">
 
-      <div className={`bg-suno-card w-full h-full md:max-w-7xl md:h-[90vh] md:rounded-2xl border-0 md:border border-white/10 overflow-hidden shadow-2xl relative ${isMobile ? 'flex flex-col' : 'flex'}`}>
+      <div className={`bg-[#0c0c12] w-full h-full md:max-w-7xl md:h-[90vh] md:rounded-2xl border-0 md:border border-white/10 overflow-hidden shadow-2xl relative ${isMobile ? 'flex flex-col' : 'flex'}`}>
 
         {/* Close Button */}
-        <button onClick={onClose} className="absolute top-3 right-3 md:top-4 md:right-4 z-50 p-2 bg-black/50 hover:bg-white/20 rounded-full text-white transition-colors">
+        <button onClick={onClose} className="absolute top-3 right-3 md:top-4 md:right-4 z-50 p-2 bg-black/60 hover:bg-red-500/80 rounded-full text-white/70 hover:text-white transition-all duration-200 active:scale-90 backdrop-blur-sm">
             <X size={isMobile ? 20 : 24} />
         </button>
 
@@ -1699,7 +1699,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
             {/* Header */}
             <div className="absolute top-0 left-0 right-0 z-10 p-3 bg-gradient-to-b from-black/80 to-transparent">
               <h2 className="text-base font-bold text-white flex items-center gap-2">
-                <Video className="text-violet-500" size={18} />
+                <Video className="text-accent-400" size={18} />
                 Video Studio
               </h2>
             </div>
@@ -1728,15 +1728,15 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
         )}
 
         {/* Sidebar Controls */}
-        <div className={`${isMobile ? 'flex-1 overflow-hidden' : 'w-96'} bg-suno-panel ${isMobile ? '' : 'border-r border-white/5'} flex flex-col z-20`}>
+        <div className={`${isMobile ? 'flex-1 overflow-hidden' : 'w-96'} bg-[#0f0f15] ${isMobile ? '' : 'border-r border-white/5'} flex flex-col z-20`}>
             {/* Header - Desktop only */}
             {!isMobile && (
               <div className="p-6 border-b border-white/5">
                   <h2 className="text-xl font-bold text-white mb-1 flex items-center gap-2">
-                      <Video className="text-violet-500" size={20} />
+                      <Video className="text-accent-400" size={20} />
                       Video Studio
                   </h2>
-                  <p className="text-zinc-500 text-xs">Create professional visualizers.</p>
+                  <p className="text-surface-500 text-xs">Create professional visualizers for your music.</p>
               </div>
             )}
 
@@ -1751,7 +1751,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                     <button 
                         key={tab.id}
                         onClick={() => setActiveTab(tab.id)}
-                        className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === tab.id ? 'text-white border-b-2 border-violet-500 bg-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
+                        className={`flex-1 flex items-center justify-center gap-2 py-3 text-xs font-bold uppercase tracking-wider transition-colors ${activeTab === tab.id ? 'text-white border-b-2 border-accent-400 bg-white/5' : 'text-zinc-500 hover:text-zinc-300'}`}
                     >
                         {tab.icon} {tab.label}
                     </button>
@@ -1768,9 +1768,9 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                             <button
                                 key={preset.id}
                                 onClick={() => setConfig({ ...config, preset: preset.id })}
-                                className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${config.preset === preset.id ? 'bg-violet-600/20 border-violet-500 text-white' : 'bg-black/20 border-white/5 text-zinc-400 hover:bg-white/5 hover:border-white/10'}`}
+                                className={`flex flex-col items-center gap-2 p-4 rounded-xl border transition-all ${config.preset === preset.id ? 'bg-accent-500/15 border-accent-400 text-white' : 'bg-black/20 border-white/5 text-zinc-400 hover:bg-white/5 hover:border-white/10'}`}
                             >
-                                <div className={`p-2 rounded-full ${config.preset === preset.id ? 'bg-violet-500 text-white' : 'bg-black/40 text-zinc-500'}`}>
+                                <div className={`p-2 rounded-full ${config.preset === preset.id ? 'bg-accent-500 text-white' : 'bg-black/40 text-zinc-500'}`}>
                                     {preset.icon}
                                 </div>
                                 <span className="text-xs font-medium">{preset.label}</span>
@@ -1792,19 +1792,19 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                                 <div className="grid grid-cols-3 gap-2">
                                      <button
                                         onClick={() => { setBackgroundType('random'); setBackgroundSeed(Date.now()); }}
-                                        className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1 ${backgroundType === 'random' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}
+                                        className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1 ${backgroundType === 'random' ? 'bg-accent-500 text-white' : 'bg-zinc-800 text-zinc-400'}`}
                                      >
                                          <Wand2 size={12}/> Random
                                      </button>
                                      <button
                                         onClick={() => setBackgroundType('custom')}
-                                        className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1 ${backgroundType === 'custom' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}
+                                        className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1 ${backgroundType === 'custom' ? 'bg-accent-500 text-white' : 'bg-zinc-800 text-zinc-400'}`}
                                      >
                                          <ImageIcon size={12}/> Image
                                      </button>
                                      <button
                                         onClick={() => setBackgroundType('video')}
-                                        className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1 ${backgroundType === 'video' ? 'bg-violet-600 text-white' : 'bg-zinc-800 text-zinc-400'}`}
+                                        className={`py-2 rounded text-xs font-bold flex items-center justify-center gap-1 ${backgroundType === 'video' ? 'bg-accent-500 text-white' : 'bg-zinc-800 text-zinc-400'}`}
                                      >
                                          <Video size={12}/> Video
                                      </button>
@@ -1890,7 +1890,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                                         type="range" min="0" max="1" step="0.1"
                                         value={config.bgDim}
                                         onChange={(e) => setConfig({...config, bgDim: parseFloat(e.target.value)})}
-                                        className="w-full accent-violet-500 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
+                                        className="w-full accent-accent-500 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
                                     />
                                 </div>
                             </div>
@@ -1961,7 +1961,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                                 type="range" min="0" max="200" step="10"
                                 value={config.particleCount}
                                 onChange={(e) => setConfig({...config, particleCount: parseInt(e.target.value)})}
-                                className="w-full accent-violet-500 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
+                                className="w-full accent-accent-500 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
                             />
                         </div>
 
@@ -2020,7 +2020,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                     <div className="space-y-4">
                         <button 
                             onClick={addTextLayer}
-                            className="w-full py-2 bg-violet-600 text-white rounded-lg flex items-center justify-center gap-2 text-xs font-bold hover:bg-violet-700"
+                            className="w-full py-2 bg-accent-500 text-white rounded-lg flex items-center justify-center gap-2 text-xs font-bold hover:bg-accent-600"
                         >
                             <Plus size={14} /> Add Text Layer
                         </button>
@@ -2044,11 +2044,11 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                                     <div className="grid grid-cols-2 gap-2">
                                         <div>
                                             <label className="text-[10px] text-zinc-500 block mb-1">X Position</label>
-                                            <input type="range" min="0" max="100" value={layer.x} onChange={(e) => updateTextLayer(layer.id, { x: parseInt(e.target.value) })} className="w-full accent-violet-500 h-1 bg-zinc-700 rounded-lg appearance-none" />
+                                            <input type="range" min="0" max="100" value={layer.x} onChange={(e) => updateTextLayer(layer.id, { x: parseInt(e.target.value) })} className="w-full accent-accent-500 h-1 bg-zinc-700 rounded-lg appearance-none" />
                                         </div>
                                         <div>
                                             <label className="text-[10px] text-zinc-500 block mb-1">Y Position</label>
-                                            <input type="range" min="0" max="100" value={layer.y} onChange={(e) => updateTextLayer(layer.id, { y: parseInt(e.target.value) })} className="w-full accent-violet-500 h-1 bg-zinc-700 rounded-lg appearance-none" />
+                                            <input type="range" min="0" max="100" value={layer.y} onChange={(e) => updateTextLayer(layer.id, { y: parseInt(e.target.value) })} className="w-full accent-accent-500 h-1 bg-zinc-700 rounded-lg appearance-none" />
                                         </div>
                                     </div>
                                     <div className="flex gap-2">
@@ -2090,13 +2090,13 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                              const intensity = intensities[effectId as keyof EffectIntensities];
 
                              return (
-                                <div key={effect.id} className={`rounded-lg border transition-all ${isActive ? 'bg-violet-600/10 border-violet-500/30' : 'bg-black/20 border-white/5'}`}>
+                                <div key={effect.id} className={`rounded-lg border transition-all ${isActive ? 'bg-accent-500/10 border-accent-500/25' : 'bg-black/20 border-white/5'}`}>
                                      <button 
                                         onClick={() => setEffects(prev => ({ ...prev, [effectId]: !prev[effectId] }))}
                                         className="w-full flex items-center justify-between p-3"
                                     >
                                         <div className="flex items-center gap-3">
-                                            <div className={`p-1.5 rounded-md ${isActive ? 'bg-violet-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
+                                            <div className={`p-1.5 rounded-md ${isActive ? 'bg-accent-500 text-white' : 'bg-zinc-800 text-zinc-500'}`}>
                                                 {effect.icon}
                                             </div>
                                             <div className="text-left">
@@ -2104,7 +2104,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                                                 <div className="text-[10px] text-zinc-500">{effect.desc}</div>
                                             </div>
                                         </div>
-                                        <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-violet-500 shadow-[0_0_8px_rgba(236,72,153,0.8)]' : 'bg-zinc-700'}`}></div>
+                                        <div className={`w-3 h-3 rounded-full ${isActive ? 'bg-accent-500 shadow-[0_0_8px_color-mix(in_srgb,var(--color-accent-500)_80%,transparent)]' : 'bg-zinc-700'}`}></div>
                                     </button>
                                     
                                     {/* Intensity Slider */}
@@ -2118,7 +2118,7 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                                                 type="range" min="0" max="1" step="0.05" 
                                                 value={intensity}
                                                 onChange={(e) => setIntensities({...intensities, [effectId]: parseFloat(e.target.value)})}
-                                                className="w-full accent-violet-500 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
+                                                className="w-full accent-accent-500 h-1 bg-zinc-700 rounded-lg appearance-none cursor-pointer"
                                             />
                                         </div>
                                     )}
@@ -2142,13 +2142,13 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
                  ) : isExporting ? (
                      <div className="w-full bg-zinc-800 rounded-xl h-12 flex items-center justify-center px-4 relative overflow-hidden">
                          <div
-                           className={`absolute left-0 top-0 bottom-0 transition-all duration-100 ${exportStage === 'capturing' ? 'bg-violet-600/20' : 'bg-blue-600/20'}`}
+                           className={`absolute left-0 top-0 bottom-0 transition-all duration-100 ${exportStage === 'capturing' ? 'bg-accent-500/15' : 'bg-blue-600/20'}`}
                            style={{ width: `${exportProgress}%` }}
                          />
                          <div className="flex items-center gap-2 z-10 text-white font-bold text-sm">
                              {exportStage === 'capturing' ? (
                                <>
-                                 <Loader2 className="animate-spin text-violet-400" size={16} />
+                                 <Loader2 className="animate-spin text-accent-400" size={16} />
                                  Rendering frames {Math.round(exportProgress)}%
                                </>
                              ) : (

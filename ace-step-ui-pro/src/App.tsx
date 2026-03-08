@@ -91,10 +91,13 @@ export default function App() {
     audio.crossOrigin = 'anonymous';
 
     const onError = () => {
+      // code 1 = MEDIA_ERR_ABORTED — fires when switching songs, not a real error
+      if (audio.error && audio.error.code === 1) return;
       setIsPlaying(false);
-      // Only show toast if there's actually a song loaded (avoid spurious errors)
       if (audio.src && audio.src !== window.location.href) {
-        setToast({ message: 'Audio playback error', type: 'error' });
+        const code = audio.error?.code;
+        const msg = code === 4 ? 'Audio format not supported' : 'Audio playback error';
+        setToast({ message: msg, type: 'error' });
       }
     };
     audio.addEventListener('error', onError);
