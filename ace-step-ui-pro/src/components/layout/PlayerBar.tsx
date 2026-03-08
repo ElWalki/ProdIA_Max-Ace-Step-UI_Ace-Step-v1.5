@@ -62,6 +62,7 @@ export default memo(function PlayerBar({
   const [shuffle, setShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
   const [expanded, setExpanded] = useState(false);
+  const [hoverPct, setHoverPct] = useState<number | null>(null);
   const glowRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
   const seekingRef = useRef(false);
@@ -346,14 +347,19 @@ export default memo(function PlayerBar({
           {/* ── Seekable glow trail at top edge ── */}
           <div
             ref={glowRef}
-            className="absolute -top-[2px] left-4 right-4 h-[10px] cursor-pointer z-10 group"
+            className="absolute -top-[3px] left-4 right-4 h-[14px] cursor-pointer z-10 group"
             onMouseDown={handleGlowSeekDown}
+            onMouseMove={e => {
+              const rect = glowRef.current?.getBoundingClientRect();
+              if (rect) setHoverPct(Math.max(0, Math.min(100, ((e.clientX - rect.left) / rect.width) * 100)));
+            }}
+            onMouseLeave={() => setHoverPct(null)}
           >
-            {/* Track background (subtle, visible on hover) */}
-            <div className="absolute inset-x-0 top-[4px] h-[2px] rounded-full bg-white/10 group-hover:bg-white/20 transition-colors" />
+            {/* Track background (widens on hover for easier targeting) */}
+            <div className="absolute inset-x-0 top-[5px] h-[2px] rounded-full bg-white/8 group-hover:h-[3px] group-hover:top-[4.5px] group-hover:bg-white/15 transition-all duration-200" />
             {/* Filled progress with animated glow */}
             <div
-              className={`absolute top-[4px] left-0 h-[2px] rounded-full transition-[width] duration-75 ${isPlaying ? 'pb-glow-anim' : 'pb-glow-idle'}`}
+              className={`absolute top-[5px] left-0 h-[2px] rounded-full group-hover:h-[3px] group-hover:top-[4.5px] transition-all duration-200 ${isPlaying ? 'pb-glow-anim' : 'pb-glow-idle'}`}
               style={{
                 width: `${progress}%`,
                 background: 'linear-gradient(90deg, var(--color-accent-500), var(--color-brand-400))',
@@ -363,11 +369,25 @@ export default memo(function PlayerBar({
                 color: 'var(--color-accent-400)',
               }}
             />
-            {/* Seek thumb (appears on hover) */}
-            <div
-              className="absolute top-[5px] w-[10px] h-[10px] rounded-full bg-white shadow-[0_0_8px_var(--color-accent-400)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
-              style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
-            />
+            {/* Time droplet tooltip (appears on hover) */}
+            {hoverPct !== null && (
+              <div
+                className="absolute pointer-events-none"
+                style={{ left: `${hoverPct}%`, top: '-22px', transform: 'translateX(-50%)' }}
+              >
+                <div
+                  className="px-1.5 py-0.5 rounded text-[9px] font-mono tabular-nums text-white whitespace-nowrap"
+                  style={{
+                    background: 'linear-gradient(135deg, var(--color-accent-600), var(--color-brand-500))',
+                    boxShadow: '0 2px 8px rgba(0,0,0,0.4)',
+                  }}
+                >
+                  {fmt(duration * hoverPct / 100)}
+                </div>
+                {/* Triangle pointer */}
+                <div className="mx-auto w-0 h-0" style={{ borderLeft: '4px solid transparent', borderRight: '4px solid transparent', borderTop: '4px solid var(--color-accent-600)' }} />
+              </div>
+            )}
           </div>
 
           {/* Main compact row */}
