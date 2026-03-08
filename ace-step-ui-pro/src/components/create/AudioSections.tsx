@@ -1,6 +1,12 @@
 import React, { useRef, useState, useCallback } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Upload, X, Volume2 } from 'lucide-react';
+import { Upload, X, Volume2, Clock } from 'lucide-react';
+
+export interface AudioHistoryItem {
+  url: string;
+  title: string;
+  timestamp: number;
+}
 
 interface AudioSectionProps {
   label: string;
@@ -14,14 +20,18 @@ interface AudioSectionProps {
   strength?: number;
   onStrengthChange?: (v: number) => void;
   accept?: string;
+  audioHistory?: AudioHistoryItem[];
+  onHistorySelect?: (item: AudioHistoryItem) => void;
 }
 
 function AudioSection({
   label, description, audioUrl, audioTitle,
   onUpload, onClear, onRecord, onSongDrop, strength, onStrengthChange, accept = 'audio/*',
+  audioHistory, onHistorySelect,
 }: AudioSectionProps) {
   const inputRef = useRef<HTMLInputElement>(null);
   const [isDragging, setIsDragging] = useState(false);
+  const [showHistory, setShowHistory] = useState(false);
 
   const handleDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -42,11 +52,36 @@ function AudioSection({
     <div className="space-y-1.5">
       <div className="flex items-center gap-2 justify-between">
         <span className="text-xs font-medium text-surface-700">{label}</span>
-        {audioTitle && (
-          <button onClick={onClear} className="text-surface-400 hover:text-red-400 transition-colors">
-            <X className="w-3.5 h-3.5" />
-          </button>
-        )}
+        <div className="flex items-center gap-1">
+          {audioHistory && audioHistory.length > 0 && (
+            <div className="relative">
+              <button onClick={() => setShowHistory(!showHistory)} className="text-surface-400 hover:text-accent-400 transition-colors" title="Recent">
+                <Clock className="w-3.5 h-3.5" />
+              </button>
+              {showHistory && (
+                <div className="absolute right-0 top-full mt-1 w-52 bg-surface-100 border border-surface-300 rounded-lg shadow-2xl z-50 overflow-hidden">
+                  <div className="max-h-36 overflow-y-auto">
+                    {audioHistory.map((item, i) => (
+                      <button
+                        key={i}
+                        onClick={() => { onHistorySelect?.(item); setShowHistory(false); }}
+                        className="w-full flex items-center gap-2 px-3 py-1.5 text-left hover:bg-surface-200 transition-colors"
+                      >
+                        <Volume2 className="w-3 h-3 text-accent-400 shrink-0" />
+                        <span className="text-[11px] text-surface-700 truncate">{item.title}</span>
+                      </button>
+                    ))}
+                  </div>
+                </div>
+              )}
+            </div>
+          )}
+          {audioTitle && (
+            <button onClick={onClear} className="text-surface-400 hover:text-red-400 transition-colors">
+              <X className="w-3.5 h-3.5" />
+            </button>
+          )}
+        </div>
       </div>
 
       {audioUrl ? (
@@ -123,11 +158,22 @@ interface AudioSectionsProps {
   onVocalStrengthChange?: (v: number) => void;
 
   onRecord?: () => void;
+
+  activeTab?: 'reference' | 'cover' | 'vocal';
+  onActiveTabChange?: (tab: 'reference' | 'cover' | 'vocal') => void;
+
+  audioHistory?: AudioHistoryItem[];
+  onHistorySelect?: (item: AudioHistoryItem, target: 'reference' | 'source' | 'vocal') => void;
 }
 
 export default function AudioSections(props: AudioSectionsProps) {
   const { t } = useTranslation();
-  const [activeTab, setActiveTab] = useState<'reference' | 'cover' | 'vocal'>('reference');
+  const [internalTab, setInternalTab] = useState<'reference' | 'cover' | 'vocal'>('reference');
+  const activeTab = props.activeTab ?? internalTab;
+  const setActiveTab = (tab: 'reference' | 'cover' | 'vocal') => {
+    setInternalTab(tab);
+    props.onActiveTabChange?.(tab);
+  };
 
   const tabs = [
     { id: 'reference' as const, label: t('audio.reference', 'Reference'), hasFile: !!props.referenceAudioUrl },
@@ -170,6 +216,8 @@ export default function AudioSections(props: AudioSectionsProps) {
             onSongDrop={props.onReferenceSongDrop}
             strength={props.referenceStrength}
             onStrengthChange={props.onReferenceStrengthChange}
+            audioHistory={props.audioHistory}
+            onHistorySelect={item => props.onHistorySelect?.(item, 'reference')}
           />
         )}
         {activeTab === 'cover' && (
@@ -183,6 +231,8 @@ export default function AudioSections(props: AudioSectionsProps) {
             onSongDrop={props.onCoverSongDrop}
             strength={props.coverStrength}
             onStrengthChange={props.onCoverStrengthChange}
+            audioHistory={props.audioHistory}
+            onHistorySelect={item => props.onHistorySelect?.(item, 'source')}
           />
         )}
         {activeTab === 'vocal' && (
@@ -197,6 +247,8 @@ export default function AudioSections(props: AudioSectionsProps) {
             strength={props.vocalStrength}
             onStrengthChange={props.onVocalStrengthChange}
             onRecord={props.onRecord}
+            audioHistory={props.audioHistory}
+            onHistorySelect={item => props.onHistorySelect?.(item, 'vocal')}
           />
         )}
       </div>

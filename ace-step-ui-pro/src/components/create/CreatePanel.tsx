@@ -1,11 +1,11 @@
 import React, { useState, useCallback, useRef, useEffect, useMemo, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Sparkles, Wand2, Upload, X, Dice5, Loader2, Mic, Music, Sliders, Piano, Save, FolderOpen, Trash2, Cpu, ChevronDown, Check, Palette, Download, RefreshCw } from 'lucide-react';
+import { Sparkles, Wand2, Upload, X, Dice5, Loader2, Mic, Music, Sliders, Piano, Save, FolderOpen, Trash2, Cpu, ChevronDown, Check, Palette, Download, RefreshCw, Disc3, Paintbrush, ListMusic } from 'lucide-react';
 import CollapsibleSection from '../ui/CollapsibleSection';
 import SliderField from '../ui/SliderField';
 import SelectField from '../ui/SelectField';
 import ToggleField from '../ui/ToggleField';
-import AudioSections from './AudioSections';
+import AudioSections, { AudioHistoryItem } from './AudioSections';
 import ChordEditor from './ChordEditor';
 import SectionControls, { SECTION_TAGS } from './SectionControls';
 import LoraManager from './LoraManager';
@@ -238,6 +238,27 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   const [showMicRecorder, setShowMicRecorder] = useState(false);
   const [micTarget, setMicTarget] = useState<'reference' | 'cover' | 'vocal'>('vocal');
 
+  // Audio tab control (lifted from AudioSections)
+  const [audioTab, setAudioTab] = useState<'reference' | 'cover' | 'vocal'>('reference');
+
+  // Full-panel drag & drop
+  const [panelDragging, setPanelDragging] = useState(false);
+  const dragCounterRef = useRef(0);
+
+  // Audio history (recent uploads, persisted in localStorage)
+  const AUDIO_HISTORY_KEY = 'acestep_audio_history';
+  const [audioHistory, setAudioHistory] = useState<AudioHistoryItem[]>(() => {
+    try { return JSON.parse(localStorage.getItem(AUDIO_HISTORY_KEY) || '[]'); } catch { return []; }
+  });
+  const addToAudioHistory = useCallback((url: string, title: string) => {
+    setAudioHistory(prev => {
+      const filtered = prev.filter(h => h.url !== url);
+      const updated = [{ url, title, timestamp: Date.now() }, ...filtered].slice(0, 20);
+      localStorage.setItem(AUDIO_HISTORY_KEY, JSON.stringify(updated));
+      return updated;
+    });
+  }, []);
+
   // Colored lyrics toggle
   const [coloredLyrics, setColoredLyrics] = useState(true);
   const lyricsContainerRef = useRef<HTMLDivElement>(null);
@@ -454,6 +475,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
     if (!token) return;
     try {
       const r = await generateApi.uploadAudio(file, token);
+      addToAudioHistory(r.url, file.name);
       if (target === 'reference') {
         set('referenceAudioUrl', r.url);
         set('referenceAudioTitle', file.name);
@@ -466,7 +488,81 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
         set('vocalAudioTitle', file.name);
       }
     } catch { /* ignore */ }
-  }, [token, set]);
+  }, [token, set, addToAudioHistory]);
+
+  // Handle selection from audio history list
+  const handleHistorySelect = useCallback((item: AudioHistoryItem, target: 'reference' | 'source' | 'vocal') => {
+    if (target === 'reference') {
+      set('referenceAudioUrl', item.url);
+      set('referenceAudioTitle', item.title);
+    } else if (target === 'source') {
+      set('sourceAudioUrl', item.url);
+      set('sourceAudioTitle', item.title);
+      set('taskType', 'cover');
+    } else {
+      set('vocalAudioUrl', item.url);
+      set('vocalAudioTitle', item.title);
+    }
+  }, [set]);
+
+  // Panel-level drag & drop handlers
+  const handlePanelDragEnter = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current++;
+    if (dragCounterRef.current === 1) setPanelDragging(true);
+  }, []);
+  const handlePanelDragLeave = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current--;
+    if (dragCounterRef.current <= 0) { dragCounterRef.current = 0; setPanelDragging(false); }
+  }, []);
+  const handlePanelDragOver = useCallback((e: React.DragEvent) => {
+    e.preventDefault();
+    e.dataTransfer.dropEffect = 'copy';
+  }, []);
+  const handlePanelDrop = useCallback(async (e: React.DragEvent) => {
+    e.preventDefault();
+    dragCounterRef.current = 0;
+    setPanelDragging(false);
+    // Route to active audio tab
+    const target = audioTab === 'reference' ? 'reference' as const : audioTab === 'cover' ? 'source' as const : 'vocal' as const;
+    // Check for song drag from workspace
+    const songUrl = e.dataTransfer.getData('text/song-audio-url');
+    const songTitle = e.dataTransfer.getData('text/song-title');
+    if (songUrl) {
+      addToAudioHistory(songUrl, songTitle || 'Untitled');
+      if (target === 'reference') { set('referenceAudioUrl', songUrl); set('referenceAudioTitle', songTitle || 'Untitled'); }
+      else if (target === 'source') { set('sourceAudioUrl', songUrl); set('sourceAudioTitle', songTitle || 'Untitled'); set('taskType', 'cover'); }
+      else { set('vocalAudioUrl', songUrl); set('vocalAudioTitle', songTitle || 'Untitled'); }
+      // Ensure custom mode is on and text section is open
+      if (!params.customMode) set('customMode', true);
+      setOpenSections(prev => ({ ...prev, text: true }));
+      return;
+    }
+    // File drop
+    const file = e.dataTransfer.files[0];
+    if (file?.type.startsWith('audio/')) {
+      if (!params.customMode) set('customMode', true);
+      setOpenSections(prev => ({ ...prev, text: true }));
+      await handleAudioSectionUpload(file, target);
+    }
+  }, [audioTab, set, params.customMode, handleAudioSectionUpload, addToAudioHistory]);
+
+  // Workflow mode handler
+  const handleWorkflowMode = useCallback((mode: 'cover' | 'repaint' | 'extend') => {
+    set('customMode', true);
+    setOpenSections(prev => ({ ...prev, text: true, expert: true }));
+    if (mode === 'cover') {
+      set('taskType', 'cover');
+      setAudioTab('cover');
+    } else if (mode === 'repaint') {
+      set('taskType', 'repaint');
+      setAudioTab('cover');
+    } else {
+      set('taskType', 'text2music');
+      setAudioTab('reference');
+    }
+  }, [set]);
 
   // Mic recording accept
   const handleMicAccept = useCallback(async (blob: Blob, filename: string) => {
@@ -535,7 +631,25 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   ];
 
   return (
-    <div className="flex flex-col h-full">
+    <div
+      className="flex flex-col h-full relative"
+      onDragEnter={handlePanelDragEnter}
+      onDragLeave={handlePanelDragLeave}
+      onDragOver={handlePanelDragOver}
+      onDrop={handlePanelDrop}
+    >
+      {/* Full-panel drop overlay */}
+      {panelDragging && (
+        <div className="absolute inset-0 z-40 bg-accent-500/10 border-2 border-dashed border-accent-500 rounded-xl flex flex-col items-center justify-center gap-2 backdrop-blur-[2px] pointer-events-none">
+          <Upload className="w-8 h-8 text-accent-400 animate-bounce" />
+          <span className="text-sm font-semibold text-accent-400">
+            {t('audio.dropOverlay', { tab: t(`audio.${audioTab}`) })}
+          </span>
+          <span className="text-[10px] text-surface-500">
+            {t('audio.dropOverlayHint', 'Drop anywhere on this panel')}
+          </span>
+        </div>
+      )}
       <div className="flex-1 overflow-y-auto px-4 py-4 space-y-3">
         {/* Model switcher + Templates bar */}
         <div className="flex items-center gap-1.5 mb-1">
@@ -738,6 +852,43 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
           </button>
         </div>
 
+        {/* Workflow mode presets */}
+        <div className="flex gap-1.5">
+          <button
+            onClick={() => handleWorkflowMode('cover')}
+            className={`flex items-center gap-1.5 flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+              params.taskType === 'cover'
+                ? 'bg-blue-500/15 border-blue-500/40 text-blue-400'
+                : 'bg-surface-100 border-surface-300/40 text-surface-500 hover:border-blue-500/30 hover:text-blue-400'
+            }`}
+          >
+            <Disc3 className="w-3.5 h-3.5" />
+            {t('workflow.cover', 'Cover')}
+          </button>
+          <button
+            onClick={() => handleWorkflowMode('repaint')}
+            className={`flex items-center gap-1.5 flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+              params.taskType === 'repaint'
+                ? 'bg-purple-500/15 border-purple-500/40 text-purple-400'
+                : 'bg-surface-100 border-surface-300/40 text-surface-500 hover:border-purple-500/30 hover:text-purple-400'
+            }`}
+          >
+            <Paintbrush className="w-3.5 h-3.5" />
+            {t('workflow.repaint', 'Repaint')}
+          </button>
+          <button
+            onClick={() => handleWorkflowMode('extend')}
+            className={`flex items-center gap-1.5 flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
+              params.taskType === 'text2music' && params.referenceAudioUrl
+                ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
+                : 'bg-surface-100 border-surface-300/40 text-surface-500 hover:border-emerald-500/30 hover:text-emerald-400'
+            }`}
+          >
+            <ListMusic className="w-3.5 h-3.5" />
+            {t('workflow.extend', 'Extend')}
+          </button>
+        </div>
+
         {/* Simple mode */}
         {!params.customMode && (
           <div className="space-y-3">
@@ -815,18 +966,22 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                 referenceAudioTitle={params.referenceAudioTitle}
                 onReferenceUpload={f => handleAudioSectionUpload(f, 'reference')}
                 onReferenceClear={() => { set('referenceAudioUrl', undefined); set('referenceAudioTitle', undefined); }}
-                onReferenceSongDrop={(url, title) => { set('referenceAudioUrl', url); set('referenceAudioTitle', title); }}
+                onReferenceSongDrop={(url, title) => { addToAudioHistory(url, title); set('referenceAudioUrl', url); set('referenceAudioTitle', title); }}
                 coverAudioUrl={params.sourceAudioUrl}
                 coverAudioTitle={params.sourceAudioTitle}
                 onCoverUpload={f => handleAudioSectionUpload(f, 'source')}
                 onCoverClear={() => { set('sourceAudioUrl', undefined); set('sourceAudioTitle', undefined); set('taskType', undefined); }}
-                onCoverSongDrop={(url, title) => { set('sourceAudioUrl', url); set('sourceAudioTitle', title); set('taskType', 'cover'); }}
+                onCoverSongDrop={(url, title) => { addToAudioHistory(url, title); set('sourceAudioUrl', url); set('sourceAudioTitle', title); set('taskType', 'cover'); }}
                 vocalAudioUrl={params.vocalAudioUrl}
                 vocalAudioTitle={params.vocalAudioTitle}
                 onVocalUpload={f => handleAudioSectionUpload(f, 'vocal')}
                 onVocalClear={() => { set('vocalAudioUrl', undefined); set('vocalAudioTitle', undefined); }}
-                onVocalSongDrop={(url, title) => { set('vocalAudioUrl', url); set('vocalAudioTitle', title); }}
+                onVocalSongDrop={(url, title) => { addToAudioHistory(url, title); set('vocalAudioUrl', url); set('vocalAudioTitle', title); }}
                 onRecord={() => { setMicTarget('vocal'); setShowMicRecorder(true); }}
+                activeTab={audioTab}
+                onActiveTabChange={setAudioTab}
+                audioHistory={audioHistory}
+                onHistorySelect={handleHistorySelect}
               />
               {/* Lyrics with colored overlay */}
               <div className="relative" ref={lyricsContainerRef}>

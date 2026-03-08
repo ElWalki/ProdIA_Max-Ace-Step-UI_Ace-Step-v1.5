@@ -139,6 +139,14 @@ const en = {
     coverDrop: 'Drop cover audio or click to upload',
     vocalLabel: 'Vocal Audio',
     vocalDrop: 'Drop vocal audio or click to upload',
+    dropOverlay: 'Drop audio for {{tab}}',
+    dropOverlayHint: 'Drop anywhere on this panel',
+    recent: 'Recent audio',
+  },
+  workflow: {
+    cover: 'Cover',
+    repaint: 'Repaint',
+    extend: 'Extend',
   },
   mic: {
     title: 'Record Audio',
@@ -677,6 +685,14 @@ const es: typeof en = {
     coverDrop: 'Arrastra audio de cover o haz clic',
     vocalLabel: 'Audio Vocal',
     vocalDrop: 'Arrastra audio vocal o haz clic',
+    dropOverlay: 'Suelta audio para {{tab}}',
+    dropOverlayHint: 'Suelta en cualquier parte del panel',
+    recent: 'Audio reciente',
+  },
+  workflow: {
+    cover: 'Cover',
+    repaint: 'Repintar',
+    extend: 'Extender',
   },
   mic: {
     title: 'Grabar Audio',
