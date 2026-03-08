@@ -1,0 +1,30 @@
+{
+  "name": "Last Light",
+  "author": "dernet",
+  "version": 1,
+  "tokens": {
+    "--bg": "#16161E",
+    "--surface": "#1E1F28",
+    "--panel": "#2D2E36",
+    "--elevated": "#363742",
+    "--border": "#4A5F8F",
+    "--border-focus": "#5ccfe6",
+    "--primary": "#5ccfe6",
+    "--secondary": "#ff4fd8",
+    "--accent": "#73d0ff",
+    "--changed": "#d7b27a",
+    "--success": "#7ec97a",
+    "--warning": "#ffcc66",
+    "--error": "#f07178",
+    "--text": "#A1A8CF",
+    "--text-bold": "#D5D8EC",
+    "--muted": "#8995BC",
+    "--text-secondary": "#7A82A6",
+    "--badge-vram": "#f07178",
+    "--badge-quality": "#87d37c",
+    "--badge-speed": "#ffcc66",
+    "--badge-neutral": "#8995BC",
+    "--border-subtle": "#3a3f4f"
+  },
+  "backgroundImage": null
+}

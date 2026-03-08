@@ -1,0 +1,30 @@
+{
+  "name": "Phosphor Green",
+  "author": "Opus 4.6",
+  "version": 1,
+  "tokens": {
+    "--bg": "#050e05",
+    "--surface": "#0c180c",
+    "--panel": "#142414",
+    "--elevated": "#1e301e",
+    "--border": "#2a5a2a",
+    "--border-focus": "#33ff66",
+    "--primary": "#33ff66",
+    "--secondary": "#66ffaa",
+    "--accent": "#55ff88",
+    "--changed": "#aacc55",
+    "--success": "#44dd44",
+    "--warning": "#ccdd44",
+    "--error": "#dd4444",
+    "--text": "#88cc88",
+    "--text-bold": "#bbeeaa",
+    "--muted": "#558855",
+    "--text-secondary": "#447744",
+    "--badge-vram": "#dd4444",
+    "--badge-quality": "#44dd44",
+    "--badge-speed": "#ccdd44",
+    "--badge-neutral": "#558855",
+    "--border-subtle": "#1e3a1e"
+  },
+  "backgroundImage": null
+}

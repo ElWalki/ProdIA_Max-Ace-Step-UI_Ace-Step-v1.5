@@ -1,0 +1,40 @@
+# ╔══════════════════════════════════════════════════════════════╗
+# ║  ProdIA-MAX — Unified Python Requirements                    ║
+# ║  Installs everything: ACE-Step engine + Side-Step trainer    ║
+# ║  pip install -r requirements.txt                             ║
+# ╚══════════════════════════════════════════════════════════════╝
+
+# ── ACE-Step 1.5 Core (generation engine) ────────────────────
+-r ACE-Step-1.5_/requirements.txt
+
+# ── Side-Step Trainer (LoRA/LoKR fine-tuning) ────────────────
+# Packages needed by Side-Step that are NOT already in ACE-Step:
+
+# Training adapters & optimizers
+safetensors
+lycoris-lora>=2.0.0
+bitsandbytes>=0.45.0
+prodigyopt>=1.1.2
+
+# Model optimization
+torchao>=0.14.1,<0.16.0
+
+# Audio analysis (offline BPM, key, stems)
+demucs>=4.0.0
+librosa>=0.10.0
+pyloudnorm>=0.1.0
+mutagen>=1.47.0
+
+# AI captioning & enrichment (optional but recommended)
+lyricsgenius>=3.0.1
+google-genai>=1.0.0
+openai>=1.54.0
+qwen-omni-utils>=0.0.6
+
+# Monitoring, CLI & GUI
+tensorboard>=2.20.0
+rich>=13.0.0
+
+# ── ProdIA-MAX Production Tools ──────────────────────────────
+# (used by detectar_bpm_clave.py, transcribir_letras.py, etc.)
+openai-whisper>=20231117

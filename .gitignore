@@ -59,7 +59,6 @@ lora_output*/
 lora_library/
 models/
 pretrained/
-Side-Step/
 LORAPRO/
 
 # Audio files

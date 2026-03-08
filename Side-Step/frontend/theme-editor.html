@@ -1,0 +1,216 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Side-Step — Theme Editor</title>
+  <link rel="icon" type="image/x-icon" href="favicon.ico">
+  <link rel="icon" type="image/png" sizes="256x256" href="icon.png">
+  <link rel="stylesheet" href="css/tokens.css">
+  <link rel="stylesheet" href="css/theme-editor.css">
+</head>
+<body>
+
+<div class="te-layout">
+
+  <!-- ============================================================
+       Top Bar
+       ============================================================ -->
+  <div class="te-topbar">
+    <span class="te-topbar__title">Side-Step Theme Editor</span>
+    <div class="te-topbar__actions">
+      <button class="te-btn" id="te-btn-import">[import]</button>
+      <button class="te-btn" id="te-btn-export">[export]</button>
+      <button class="te-btn te-btn--primary" id="te-btn-save">[save]</button>
+    </div>
+  </div>
+
+  <!-- ============================================================
+       Editor Panel (left)
+       ============================================================ -->
+  <div class="te-editor" id="te-editor">
+    <!-- Populated by theme-editor.js -->
+  </div>
+
+  <!-- ============================================================
+       Live Preview (right)
+       ============================================================ -->
+  <div class="te-preview">
+    <div class="te-preview-frame" id="te-preview-frame">
+
+      <!-- Mock Top Bar -->
+      <div class="te-mock-topbar">
+        <span class="te-mock-topbar__logo">Side-Step</span>
+        <span class="te-mock-topbar__tab active">Setup</span>
+        <span class="te-mock-topbar__tab">Monitor</span>
+        <span class="te-mock-topbar__tab">Lab</span>
+        <span class="te-mock-topbar__tab" style="color:var(--muted);">[=]</span>
+      </div>
+
+      <!-- Section Header -->
+      <div class="te-mock-section">Get Started</div>
+
+      <!-- Panel with form fields -->
+      <div class="te-mock-panel">
+        <div class="te-mock-form-row">
+          <div class="te-mock-form-group">
+            <label>Model</label>
+            <input class="te-mock-input" type="text" value="stable-audio-open turbo" readonly>
+          </div>
+          <div class="te-mock-form-group">
+            <label>Dataset</label>
+            <input class="te-mock-input" type="text" value="my_music_dataset" readonly>
+          </div>
+        </div>
+        <div class="te-mock-form-row">
+          <div class="te-mock-form-group">
+            <label>Epochs</label>
+            <input class="te-mock-input" type="text" value="100" readonly>
+          </div>
+          <div class="te-mock-form-group">
+            <label>Learning Rate</label>
+            <input class="te-mock-input" type="text" value="3e-4" readonly style="border-left: 4px solid var(--primary);">
+          </div>
+        </div>
+      </div>
+
+      <!-- Buttons -->
+      <div class="te-mock-section">Actions</div>
+      <div class="te-mock-btn-row">
+        <button class="te-btn te-btn--primary">[start training]</button>
+        <button class="te-btn te-btn--success">[export lora]</button>
+        <button class="te-btn te-btn--danger">[stop]</button>
+        <button class="te-btn">[presets]</button>
+      </div>
+
+      <!-- Text color samples -->
+      <div class="te-mock-section">Text Colors</div>
+      <div class="te-mock-text-samples">
+        <div style="color:var(--primary);">Primary text -- headings, focus, info</div>
+        <div style="color:var(--secondary);">Secondary text -- recalled/default values</div>
+        <div style="color:var(--accent);">Accent text -- hover, links, focus rings</div>
+        <div style="color:var(--changed);">Changed text -- edited/non-default values</div>
+        <div style="color:var(--success);">Success text -- [ok], confirmed, detected</div>
+        <div style="color:var(--warning);">Warning text -- [!] caution, stale states</div>
+        <div style="color:var(--error);">Error text -- [x] failures, invalid</div>
+        <div style="color:var(--text);">Normal body text -- default content</div>
+        <div style="color:var(--text-bold);font-weight:bold;">Bold text -- emphasis</div>
+        <div style="color:var(--muted);">Muted text -- hints, secondary labels</div>
+        <div style="color:var(--text-secondary);">Tertiary text -- deeply subdued</div>
+      </div>
+
+      <!-- Badges -->
+      <div class="te-mock-section">Badges</div>
+      <div class="te-mock-badges">
+        <span class="te-mock-badge" style="background:var(--badge-vram);color:var(--bg);">VRAM: 8.2 GB</span>
+        <span class="te-mock-badge" style="background:var(--badge-quality);color:var(--bg);">Quality: High</span>
+        <span class="te-mock-badge" style="background:var(--badge-speed);color:var(--bg);">Speed: Fast</span>
+        <span class="te-mock-badge" style="background:var(--badge-neutral);color:var(--bg);">Neutral</span>
+      </div>
+
+      <!-- Progress bars -->
+      <div class="te-mock-section">Progress</div>
+      <div class="te-mock-panel">
+        <div style="font-size:var(--font-size-sm);color:var(--text);margin-bottom:4px;">Training epoch 42/100</div>
+        <div class="te-mock-progress">
+          <div class="te-mock-progress__fill" style="width:42%;background:var(--primary);"></div>
+        </div>
+        <div style="font-size:var(--font-size-sm);color:var(--text);margin-bottom:4px;">Preprocessing [ok]</div>
+        <div class="te-mock-progress">
+          <div class="te-mock-progress__fill" style="width:100%;background:var(--success);"></div>
+        </div>
+        <div style="font-size:var(--font-size-sm);color:var(--text);margin-bottom:4px;">VRAM usage [!]</div>
+        <div class="te-mock-progress">
+          <div class="te-mock-progress__fill" style="width:85%;background:var(--warning);"></div>
+        </div>
+        <div style="font-size:var(--font-size-sm);color:var(--text);margin-bottom:4px;">Error state</div>
+        <div class="te-mock-progress">
+          <div class="te-mock-progress__fill" style="width:30%;background:var(--error);"></div>
+        </div>
+      </div>
+
+      <!-- Table -->
+      <div class="te-mock-section">Data Table</div>
+      <table class="te-mock-table">
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Status</th>
+            <th>Duration</th>
+            <th>Size</th>
+          </tr>
+        </thead>
+        <tbody>
+          <tr>
+            <td>track_01.wav</td>
+            <td style="color:var(--success);">[ok]</td>
+            <td>3:24</td>
+            <td>12.4 MB</td>
+          </tr>
+          <tr>
+            <td>track_02.wav</td>
+            <td style="color:var(--success);">[ok]</td>
+            <td>4:12</td>
+            <td>15.8 MB</td>
+          </tr>
+          <tr>
+            <td>track_03.wav</td>
+            <td style="color:var(--warning);">[!]</td>
+            <td>0:45</td>
+            <td>2.1 MB</td>
+          </tr>
+          <tr>
+            <td>track_04.wav</td>
+            <td style="color:var(--error);">[x]</td>
+            <td>--</td>
+            <td>0 B</td>
+          </tr>
+        </tbody>
+      </table>
+
+      <!-- Toasts -->
+      <div class="te-mock-section">Toasts</div>
+      <div class="te-mock-toast" style="border-color:var(--success);">
+        <span style="color:var(--success);">[ok]</span> Training completed successfully. LoRA saved.
+      </div>
+      <div class="te-mock-toast" style="border-color:var(--warning);">
+        <span style="color:var(--warning);">[!]</span> VRAM usage is high. Consider reducing batch size.
+      </div>
+      <div class="te-mock-toast" style="border-color:var(--error);">
+        <span style="color:var(--error);">[x]</span> Training failed: CUDA out of memory.
+      </div>
+      <div class="te-mock-toast" style="border-color:var(--primary);">
+        <span style="color:var(--primary);">[i]</span> New model checkpoint detected.
+      </div>
+
+      <!-- Elevated surface sample -->
+      <div class="te-mock-section">Surface Hierarchy</div>
+      <div style="display:flex;gap:var(--space-sm);margin-bottom:var(--space-md);">
+        <div style="flex:1;padding:var(--space-md);background:var(--bg);border:1px solid var(--border);border-radius:var(--radius);">
+          <div style="font-size:var(--font-size-xs);color:var(--muted);margin-bottom:4px;">--bg</div>
+          <div style="color:var(--text);">Background</div>
+        </div>
+        <div style="flex:1;padding:var(--space-md);background:var(--surface);border:1px solid var(--border);border-radius:var(--radius);">
+          <div style="font-size:var(--font-size-xs);color:var(--muted);margin-bottom:4px;">--surface</div>
+          <div style="color:var(--text);">Surface</div>
+        </div>
+        <div style="flex:1;padding:var(--space-md);background:var(--panel);border:1px solid var(--border);border-radius:var(--radius);">
+          <div style="font-size:var(--font-size-xs);color:var(--muted);margin-bottom:4px;">--panel</div>
+          <div style="color:var(--text);">Panel</div>
+        </div>
+        <div style="flex:1;padding:var(--space-md);background:var(--elevated);border:1px solid var(--border);border-radius:var(--radius);">
+          <div style="font-size:var(--font-size-xs);color:var(--muted);margin-bottom:4px;">--elevated</div>
+          <div style="color:var(--text);">Elevated</div>
+        </div>
+      </div>
+
+    </div><!-- /te-preview-frame -->
+
+    <div class="te-status" id="te-status">Loading...</div>
+  </div>
+
+</div>
+
+<script src="js/theme-editor.js"></script>
+</body>
+</html>

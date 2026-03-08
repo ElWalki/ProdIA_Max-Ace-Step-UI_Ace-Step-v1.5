@@ -13,7 +13,9 @@ echo.
 
 REM ─── Rutas / Paths ──────────────────────────────────────────
 set "ACESTEP_DIR=%~dp0ACE-Step-1.5_"
+set "SIDESTEP_DIR=%~dp0Side-Step"
 set "UI_DIR=%~dp0ace-step-ui"
+set "PRO_UI_DIR=%~dp0ace-step-ui-pro"
 set "VENV=%ACESTEP_DIR%\.venv"
 
 REM ─── Verificar Node.js / Check Node.js ──────────────────────
@@ -81,20 +83,22 @@ REM ─── Instalar dependencias Python si es necesario ───────
 REM     Solo instala si no existe el marker o si requirements.txt cambio
 REM     Install Python deps only if marker missing or requirements.txt changed
 set "PY_MARKER=%ACESTEP_DIR%\.deps_installed"
+set "TOP_REQS=%~dp0requirements.txt"
 set "NEED_PY_INSTALL=0"
 if not exist "%PY_MARKER%" set "NEED_PY_INSTALL=1"
 if "%NEED_PY_INSTALL%"=="0" (
-    REM Comprobar si requirements.txt es mas nuevo que el marker
-    for /f "tokens=*" %%a in ('powershell -NoProfile -Command "if ((Get-Item \"%ACESTEP_DIR%\requirements.txt\" -ErrorAction SilentlyContinue).LastWriteTime -gt (Get-Item \"%PY_MARKER%\" -ErrorAction SilentlyContinue).LastWriteTime) { echo 1 } else { echo 0 }"') do set "NEED_PY_INSTALL=%%a"
+    REM Comprobar si requirements.txt (top-level o ACE-Step) es mas nuevo que el marker
+    for /f "tokens=*" %%a in ('powershell -NoProfile -Command "$m=(Get-Item \"%PY_MARKER%\" -EA SilentlyContinue).LastWriteTime; $r1=(Get-Item \"%TOP_REQS%\" -EA SilentlyContinue).LastWriteTime; $r2=(Get-Item \"%ACESTEP_DIR%\requirements.txt\" -EA SilentlyContinue).LastWriteTime; if($r1 -gt $m -or $r2 -gt $m){echo 1}else{echo 0}"') do set "NEED_PY_INSTALL=%%a"
 )
 if "%NEED_PY_INSTALL%"=="1" (
     echo.
     echo  [Setup] Instalando dependencias Python / Installing Python dependencies...
+    echo          ACE-Step + Side-Step + ProdIA tools
     echo          Esto puede tardar varios minutos / This may take several minutes...
     echo.
     "%PYTHON%" -m pip install --upgrade pip >nul 2>&1
-    if exist "%ACESTEP_DIR%\requirements.txt" (
-        "%PYTHON%" -m pip install -r "%ACESTEP_DIR%\requirements.txt"
+    if exist "%TOP_REQS%" (
+        "%PYTHON%" -m pip install -r "%TOP_REQS%"
         if %errorlevel% neq 0 (
             echo.
             echo  [AVISO / WARNING] Algunos paquetes pueden haber fallado.
@@ -143,7 +147,7 @@ if not exist "%UI_DIR%\server\node_modules" (
 cd /d "%~dp0"
 
 REM ─── Matar procesos previos / Kill previous processes ────────
-echo  [0/3] Liberando puertos / Freeing ports (8001, 3001, 3000)...
+echo  [0/4] Liberando puertos / Freeing ports (8001, 3001, 3000, 3002)...
 for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":8001 " ^| findstr "LISTENING"') do (
     taskkill /F /PID %%p >nul 2>&1
 )
@@ -151,6 +155,9 @@ for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":3001 " ^| findstr "LISTENIN
     taskkill /F /PID %%p >nul 2>&1
 )
 for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":3000 " ^| findstr "LISTENING"') do (
+    taskkill /F /PID %%p >nul 2>&1
+)
+for /f "tokens=5" %%p in ('netstat -aon ^| findstr ":3002 " ^| findstr "LISTENING"') do (
     taskkill /F /PID %%p >nul 2>&1
 )
 timeout /t 2 /nobreak >nul
@@ -161,6 +168,49 @@ for /f "tokens=2 delims=:" %%a in ('ipconfig ^| findstr /c:"IPv4"') do (
     for /f "tokens=1" %%b in ("%%a") do set LOCAL_IP=%%b
 )
 
+REM ─── Variables de entorno heredadas / Inherited env vars ─────
+set "ACESTEP_CACHE_DIR=%ACESTEP_DIR%.cache\acestep"
+set "HF_HOME=%ACESTEP_DIR%.cache\huggingface"
+set "ACESTEP_PATH=%ACESTEP_DIR%"
+set "DATASETS_DIR=%ACESTEP_DIR%\datasets"
+
+REM ─── Crear lanzadores temporales / Create temp launchers ─────
+REM   (evita problemas de comillas anidadas en rutas con espacios)
+set "LAUNCHER_DIR=%TEMP%\acestep_launchers"
+if not exist "%LAUNCHER_DIR%" mkdir "%LAUNCHER_DIR%"
+
+> "%LAUNCHER_DIR%\_gradio.cmd" (
+    echo @echo off
+    echo title ACE-Step Gradio API
+    echo cd /d "%ACESTEP_DIR%"
+    echo "%PYTHON%" -m acestep.acestep_v15_pipeline --port 8001 --enable-api --backend pt --server-name 127.0.0.1 --config_path acestep-v15-turbo
+    echo pause
+)
+
+> "%LAUNCHER_DIR%\_backend.cmd" (
+    echo @echo off
+    echo title ACE-Step Backend
+    echo cd /d "%UI_DIR%\server"
+    echo npm run dev
+    echo pause
+)
+
+> "%LAUNCHER_DIR%\_frontend.cmd" (
+    echo @echo off
+    echo title ACE-Step Frontend
+    echo cd /d "%UI_DIR%"
+    echo npm run dev
+    echo pause
+)
+
+> "%LAUNCHER_DIR%\_proui.cmd" (
+    echo @echo off
+    echo title ACE-Step Pro UI
+    echo cd /d "%PRO_UI_DIR%"
+    echo npm run dev
+    echo pause
+)
+
 REM ═══════════════════════════════════════════════════════════
 REM  PASO 1: Iniciar Gradio API con auto-inicializacion
 REM  --enable-api activa init_service automaticamente
@@ -169,9 +219,28 @@ REM  --config_path acestep-v15-turbo modelo por defecto
 REM  Flash attention se auto-detecta
 REM ═══════════════════════════════════════════════════════════
 echo.
-echo  [1/3] Iniciando / Starting ACE-Step Gradio API (puerto/port 8001)...
+REM ─── Instalar dependencias Pro UI / Install Pro UI deps ──────
+if exist "%PRO_UI_DIR%\package.json" (
+    if not exist "%PRO_UI_DIR%\node_modules" (
+        echo  [!] Dependencias Pro UI no instaladas / Pro UI deps not installed. Instalando / Installing...
+        cd /d "%PRO_UI_DIR%"
+        call npm install
+        if %errorlevel% neq 0 (
+            echo  [ERROR] npm install Pro UI fallo / failed.
+            pause
+            exit /b 1
+        )
+    ) else (
+        echo  [*] Verificando dependencias Pro UI / Checking Pro UI deps...
+        cd /d "%PRO_UI_DIR%"
+        call npm install --prefer-offline >nul 2>&1
+    )
+    cd /d "%~dp0"
+)
 
-start "ACE-Step Gradio API" cmd /s /k "title ACE-Step Gradio API && cd /d "%ACESTEP_DIR%" && set "ACESTEP_CACHE_DIR=%ACESTEP_DIR%.cache\acestep" && set "HF_HOME=%ACESTEP_DIR%.cache\huggingface" && "%PYTHON%" -m acestep.acestep_v15_pipeline --port 8001 --enable-api --backend pt --server-name 127.0.0.1 --config_path acestep-v15-turbo"
+echo  [1/4] Iniciando / Starting ACE-Step Gradio API (puerto/port 8001)...
+
+start "ACE-Step Gradio API" "%LAUNCHER_DIR%\_gradio.cmd"
 
 REM ─── Esperar / Wait for Gradio ──────────────────────────────
 echo.
@@ -243,8 +312,8 @@ echo.
 REM ═══════════════════════════════════════════════════════════
 REM  PASO 2 / STEP 2: Backend Node.js
 REM ═══════════════════════════════════════════════════════════
-echo  [2/3] Iniciando / Starting Backend (puerto/port 3001)...
-start "ACE-Step UI Backend" cmd /s /k "title ACE-Step Backend && cd /d "%UI_DIR%\server" && set "ACESTEP_PATH=%ACESTEP_DIR%" && set "DATASETS_DIR=%ACESTEP_DIR%\datasets" && npm run dev"
+echo  [2/4] Iniciando / Starting Backend (puerto/port 3001)...
+start "ACE-Step Backend" "%LAUNCHER_DIR%\_backend.cmd"
 
 echo  Esperando backend / Waiting for backend...
 timeout /t 5 /nobreak >nul
@@ -252,10 +321,22 @@ timeout /t 5 /nobreak >nul
 REM ═══════════════════════════════════════════════════════════
 REM  PASO 3 / STEP 3: Frontend
 REM ═══════════════════════════════════════════════════════════
-echo  [3/3] Iniciando / Starting Frontend (puerto/port 3000)...
-start "ACE-Step UI Frontend" cmd /s /k "title ACE-Step Frontend && cd /d "%UI_DIR%" && npm run dev"
+echo  [3/4] Iniciando / Starting Frontend (puerto/port 3000)...
+start "ACE-Step Frontend" "%LAUNCHER_DIR%\_frontend.cmd"
 
-timeout /t 5 /nobreak >nul
+timeout /t 3 /nobreak >nul
+
+REM ═══════════════════════════════════════════════════════════
+REM  PASO 4 / STEP 4: Pro UI
+REM ═══════════════════════════════════════════════════════════
+if exist "%PRO_UI_DIR%\package.json" (
+    echo  [4/4] Iniciando / Starting Pro UI (puerto/port 3002)...
+    start "ACE-Step Pro UI" "%LAUNCHER_DIR%\_proui.cmd"
+) else (
+    echo  [4/4] Pro UI no encontrada / not found. Omitiendo / Skipping.
+)
+
+timeout /t 3 /nobreak >nul
 
 REM ═══════════════════════════════════════════════════════════
 echo.
@@ -266,11 +347,17 @@ echo ║                                                          ║
 echo ║   Gradio API:  http://localhost:8001                     ║
 echo ║   Backend:     http://localhost:3001                     ║
 echo ║   Frontend:    http://localhost:3000                     ║
+echo ║   Pro UI:      http://localhost:3002                     ║
 echo ║                                                          ║
 if defined LOCAL_IP (
-echo ║   LAN:         http://%LOCAL_IP%:3000                    ║
+echo ║   LAN Classic: http://%LOCAL_IP%:3000                    ║
+echo ║   LAN Pro:    http://%LOCAL_IP%:3002                     ║
 echo ║                                                          ║
 )
+echo ║   Cambia entre interfaces en el navegador:               ║
+echo ║   Switch UIs in browser:                                 ║
+echo ║     :3000 = Classic UI  /  :3002 = Pro UI                ║
+echo ║                                                          ║
 echo ║   LoRA: Cargalo / Load from UI in LoRA section           ║
 echo ║   (Custom mode -> LoRA -> Browse -> Load)                ║
 echo ║                                                          ║

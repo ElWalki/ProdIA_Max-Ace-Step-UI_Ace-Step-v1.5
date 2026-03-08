@@ -1,0 +1,49 @@
+# Side-Step Sidecar Metadata Example
+#
+# Place a .txt file next to each audio file with the SAME name:
+#   my_song.wav  →  my_song.txt
+#
+# All fields are optional. Side-Step will use sensible defaults
+# for anything you leave out (e.g. caption derived from filename,
+# lyrics set to [Instrumental]).
+#
+# These values are used to build the text prompt that the model
+# trains on — they are NOT stored as raw key: value pairs in the
+# tensor. The format matches upstream ACE-Step exactly.
+#
+# ── Accepted field names & aliases ──────────────────────────────
+#   caption                         Main text description
+#   genre                           Comma-separated genres
+#   bpm (or tempo)                  Beats per minute
+#   key (or keyscale, scale)        Musical key (e.g. C minor)
+#   signature (or timesignature,    Time signature (e.g. 4/4)
+#              time_signature, sig)
+#   language (or lang)              Vocal language (e.g. english)
+#   is_instrumental                 true / false
+#   lyrics                          Multi-line, always last field
+#   custom_tag (or trigger, tags)   Trigger tag for the adapter
+#   prompt_override                 Replace prompt with caption
+#   repeat                          Per-sample repetition count
+#   duration                        Duration in seconds
+#
+# ── Required by the model (highly recommended) ──────────────────
+caption: A dreamy lo-fi ambient track with warm pads and soft rain
+#
+# ── Musical metadata (improves prompt quality) ──────────────────
+genre: ambient, lo-fi
+bpm: 85
+key: C minor
+signature: 4/4
+language: english
+is_instrumental: false
+#
+# ── Lyrics (leave out or set to [Instrumental] for instrumentals)
+# Multi-line: everything after "lyrics:" until the next key or EOF.
+lyrics:
+[Verse]
+Raindrops on the window pane
+Soft echoes down the lane
+
+[Chorus]
+Drifting through the haze
+Lost in purple days
