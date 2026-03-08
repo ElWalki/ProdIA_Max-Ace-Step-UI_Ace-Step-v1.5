@@ -238,8 +238,8 @@ function scanLibrary(libraryDir: string): LoraEntry[] {
       continue;
     }
     
-    // Case 2: Training output structure (has final/, checkpoints/, etc.)
-    const hasFinal = fs.existsSync(path.join(full, 'final')) || fs.existsSync(path.join(full, 'final_lora'));
+    // Case 2: Training output structure (has final/, best/, checkpoints/, etc.)
+    const hasFinal = fs.existsSync(path.join(full, 'final')) || fs.existsSync(path.join(full, 'final_lora')) || fs.existsSync(path.join(full, 'best'));
     const hasCheckpoints = fs.existsSync(path.join(full, 'checkpoints'));
     if (hasFinal || hasCheckpoints) {
       // Use scanOutputDir but override source to 'library'
@@ -286,6 +286,18 @@ function scanOutputDir(outputDir: string, sourceDir?: string): LoraEntry[] {
     }
   }
 
+  // Check for "best" adapter (Side-Step trainer output)
+  const bestCandidates = [
+    path.join(outputDir, 'best', 'adapter'),
+    path.join(outputDir, 'best'),
+  ];
+  for (const candidate of bestCandidates) {
+    if (isAdapterDir(candidate)) {
+      variants.push({ label: 'best', path: candidate });
+      break;
+    }
+  }
+
   // Check for checkpoints
   const checkpointsDir = path.join(outputDir, 'checkpoints');
   if (fs.existsSync(checkpointsDir) && fs.statSync(checkpointsDir).isDirectory()) {
@@ -310,6 +322,8 @@ function scanOutputDir(outputDir: string, sourceDir?: string): LoraEntry[] {
   variants.sort((a, b) => {
     if (a.label === 'final') return -1;
     if (b.label === 'final') return 1;
+    if (a.label === 'best') return -1;
+    if (b.label === 'best') return 1;
     return (a.epoch ?? 0) - (b.epoch ?? 0);
   });
 
@@ -338,7 +352,7 @@ function scanOutputDir(outputDir: string, sourceDir?: string): LoraEntry[] {
 
   // Check for sub-directories that look like separate training runs (e.g. final_lora_test_v3_Walki-bass/)
   for (const child of fs.readdirSync(outputDir)) {
-    if (child === 'checkpoints' || child === 'logs' || child === 'lora_output' || child === 'final' || child === 'final_lora') continue;
+    if (child === 'checkpoints' || child === 'logs' || child === 'lora_output' || child === 'final' || child === 'final_lora' || child === 'best') continue;
     const childPath = path.join(outputDir, child);
     if (!fs.statSync(childPath).isDirectory()) continue;
     // Check if this looks like a training output (has adapter/ subfolder or checkpoints/)
