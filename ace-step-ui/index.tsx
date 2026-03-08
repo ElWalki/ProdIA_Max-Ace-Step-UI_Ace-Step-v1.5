@@ -1,11 +1,10 @@
 import React from 'react';
 import ReactDOM from 'react-dom/client';
+import './i18n'; // Initialize i18next before rendering
 import App from './App';
 import { AuthProvider } from './context/AuthContext';
 import { ResponsiveProvider } from './context/ResponsiveContext';
-import { I18nProvider } from './context/I18nContext';
 import { ErrorBoundary } from './components/ErrorBoundary';
-import './i18n';
 
 const rootElement = document.getElementById('root');
 if (!rootElement) {
@@ -16,13 +15,11 @@ const root = ReactDOM.createRoot(rootElement);
 root.render(
   <React.StrictMode>
     <ErrorBoundary>
-      <I18nProvider>
-        <AuthProvider>
-          <ResponsiveProvider>
-            <App />
-          </ResponsiveProvider>
-        </AuthProvider>
-      </I18nProvider>
+      <AuthProvider>
+        <ResponsiveProvider>
+          <App />
+        </ResponsiveProvider>
+      </AuthProvider>
     </ErrorBoundary>
   </React.StrictMode>
 );
