@@ -1,6 +1,6 @@
 import React, { useState, useMemo, useCallback, useRef, useEffect } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Music, Play, Square, Plus, Sparkles, ChevronDown, ChevronUp, Trash2, Piano, X } from 'lucide-react';
+import { Music, Play, Square, Plus, Sparkles, ChevronDown, ChevronUp, Trash2, Piano, X, Save, FolderOpen } from 'lucide-react';
 import type { ChordProgressionState, ScaleType, ProgressionMood } from '../../types';
 import {
   resolveProgression, resolveChord, parseRoman, CHORD_PRESETS, AVAILABLE_KEYS,
@@ -18,6 +18,8 @@ interface PlacedChord {
   id: string;
   roman: string;
   octaveShift: number;
+  /** Duration in beats (default = beatsPerChord from parent) */
+  beats?: number;
 }
 
 const QUICK_CHORDS_MAJOR = ['I', 'ii', 'iii', 'IV', 'V', 'vi', 'vii°'];
@@ -63,6 +65,47 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
     if (!engineRef.current) engineRef.current = new ChordAudioEngine();
     return engineRef.current;
   }, []);
+
+  // ── Saved progression sequences (localStorage) ────────────────────
+  interface SavedSequence {
+    name: string;
+    key: string;
+    scale: ScaleType;
+    bpm: number;
+    beatsPerChord: number;
+    chords: PlacedChord[];
+  }
+  const SEQUENCES_KEY = 'acestep_chord_sequences';
+  const [savedSequences, setSavedSequences] = useState<SavedSequence[]>(() => {
+    try { return JSON.parse(localStorage.getItem(SEQUENCES_KEY) || '[]'); } catch { return []; }
+  });
+  const [showSequences, setShowSequences] = useState(false);
+  const [sequenceName, setSequenceName] = useState('');
+
+  const saveSequence = useCallback(() => {
+    const name = sequenceName.trim() || `Seq ${savedSequences.length + 1}`;
+    const seq: SavedSequence = {
+      name, key: value.key, scale: value.scale, bpm: value.bpm,
+      beatsPerChord: value.beatsPerChord, chords: placedChords,
+    };
+    const updated = [...savedSequences.filter(s => s.name !== name), seq];
+    setSavedSequences(updated);
+    localStorage.setItem(SEQUENCES_KEY, JSON.stringify(updated));
+    setSequenceName('');
+    setShowSequences(false);
+  }, [sequenceName, savedSequences, value, placedChords]);
+
+  const loadSequence = useCallback((seq: SavedSequence) => {
+    onChange({ key: seq.key, scale: seq.scale, bpm: seq.bpm, beatsPerChord: seq.beatsPerChord, roman: seq.chords.map(c => c.roman).join(' - ') });
+    setPlacedChords(seq.chords.map(c => ({ ...c, id: uid() })));
+    setShowSequences(false);
+  }, [onChange]);
+
+  const deleteSequence = useCallback((name: string) => {
+    const updated = savedSequences.filter(s => s.name !== name);
+    setSavedSequences(updated);
+    localStorage.setItem(SEQUENCES_KEY, JSON.stringify(updated));
+  }, [savedSequences]);
 
   // Sync parent → internal (presets, manual input, external changes)
   useEffect(() => {
@@ -143,17 +186,24 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
     getEngine().playChord(notes, 0.5);
   }, [getEngine]);
 
+  const playStopRef = useRef(false);
+
   const handlePlay = useCallback(async () => {
-    if (isPlaying) { getEngine().stop(); setIsPlaying(false); return; }
+    if (isPlaying) { playStopRef.current = true; getEngine().stop(); setIsPlaying(false); setPlayingIdx(-1); return; }
     if (resolvedPlaced.length === 0) return;
+    playStopRef.current = false;
     setIsPlaying(true);
     const beatDur = 60 / value.bpm;
-    for (const chord of resolvedPlaced) {
-      getEngine().playChord(chord.notes, beatDur * value.beatsPerChord * 0.9);
-      await new Promise(r => setTimeout(r, beatDur * value.beatsPerChord * 1000));
+    for (let i = 0; i < resolvedPlaced.length; i++) {
+      if (playStopRef.current) break;
+      setPlayingIdx(i);
+      const chordBeats = placedChords[i]?.beats ?? value.beatsPerChord;
+      getEngine().playChord(resolvedPlaced[i].notes, beatDur * chordBeats * 0.9);
+      await new Promise(r => setTimeout(r, beatDur * chordBeats * 1000));
     }
     setIsPlaying(false);
-  }, [isPlaying, resolvedPlaced, value.bpm, value.beatsPerChord, getEngine]);
+    setPlayingIdx(-1);
+  }, [isPlaying, resolvedPlaced, placedChords, value.bpm, value.beatsPerChord, getEngine]);
 
   const handleApply = useCallback(() => {
     const data = formatProgressionForGeneration(value.roman, value.key, value.scale);
@@ -196,16 +246,38 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
     setDeleteHover(false);
   }, []);
 
-  const onDropZoneOver = useCallback((e: React.DragEvent, idx: number) => {
+  // Compute insertion index from cursor position inside the timeline container
+  const timelineRef = useRef<HTMLDivElement>(null);
+  const computeDropIndex = useCallback((e: React.DragEvent) => {
+    const container = timelineRef.current;
+    if (!container) return placedChords.length;
+    const chordEls = container.querySelectorAll('[data-chord-idx]');
+    for (const el of chordEls) {
+      const rect = (el as HTMLElement).getBoundingClientRect();
+      const midX = rect.left + rect.width / 2;
+      if (e.clientX < midX) {
+        return parseInt((el as HTMLElement).dataset.chordIdx!, 10);
+      }
+    }
+    return placedChords.length;
+  }, [placedChords.length]);
+
+  const onTimelineDragOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
     e.dataTransfer.dropEffect = draggingFrom === 'palette' ? 'copy' : 'move';
-    setDropIndex(idx);
-  }, [draggingFrom]);
+    setDropIndex(computeDropIndex(e));
+  }, [draggingFrom, computeDropIndex]);
 
-  const onDropZoneLeave = useCallback(() => { setDropIndex(null); }, []);
+  const onTimelineDragLeave = useCallback((e: React.DragEvent) => {
+    // Only clear if leaving the container itself
+    if (timelineRef.current && !timelineRef.current.contains(e.relatedTarget as Node)) {
+      setDropIndex(null);
+    }
+  }, []);
 
-  const onDropZoneDrop = useCallback((e: React.DragEvent, idx: number) => {
+  const onTimelineDrop = useCallback((e: React.DragEvent) => {
     e.preventDefault();
+    const idx = computeDropIndex(e);
     const fromPalette = e.dataTransfer.getData('text/chord-palette');
     if (fromPalette) insertChordAt(idx, fromPalette);
     const reIdx = e.dataTransfer.getData('text/chord-index');
@@ -213,7 +285,7 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
     setDropIndex(null);
     setDraggingFrom(null);
     setDraggingIndex(null);
-  }, [insertChordAt, moveChord]);
+  }, [computeDropIndex, insertChordAt, moveChord]);
 
   const onDeleteOver = useCallback((e: React.DragEvent) => {
     e.preventDefault();
@@ -230,20 +302,15 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
     setDraggingIndex(null);
   }, [removeChord]);
 
-  // ── Render helpers ────────────────────────────────────────────────
-  const renderDropZone = (idx: number) => (
-    <div
-      key={`dz-${idx}`}
-      onDragOver={e => onDropZoneOver(e, idx)}
-      onDragLeave={onDropZoneLeave}
-      onDrop={e => onDropZoneDrop(e, idx)}
-      className={`w-1.5 self-stretch rounded-full transition-all shrink-0
-        ${dropIndex === idx
-          ? 'bg-accent-500 shadow-[0_0_8px_theme(colors.accent.500/50)]'
-          : 'bg-transparent'
-        }`}
-    />
-  );
+  // Per-chord beat duration setter
+  const setChordBeats = useCallback((index: number, beats: number) => {
+    setPlacedChords(prev => prev.map((pc, i) =>
+      i === index ? { ...pc, beats: Math.max(0.5, Math.min(8, beats)) } : pc,
+    ));
+  }, []);
+
+  // Playing highlight index
+  const [playingIdx, setPlayingIdx] = useState(-1);
 
   return (
     <div className="space-y-3">
@@ -347,7 +414,7 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
         </div>
       </div>
 
-      {/* ── Progression Timeline (drop target) ────────── */}
+      {/* ── Progression Timeline (intuitive drop target with ghost preview) ────────── */}
       <div className="rounded-xl border border-surface-300 bg-surface-50 p-2">
         <div className="flex items-center gap-1 mb-2">
           <span className="text-[10px] font-medium text-surface-500 uppercase tracking-wider">
@@ -358,24 +425,70 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
           </span>
         </div>
 
-        <div className="flex items-center gap-0 overflow-x-auto pb-1 min-h-[68px]">
-          {renderDropZone(0)}
+        <div
+          ref={timelineRef}
+          onDragOver={onTimelineDragOver}
+          onDragLeave={onTimelineDragLeave}
+          onDrop={onTimelineDrop}
+          className="flex items-stretch gap-1 overflow-x-auto pb-1 min-h-[84px]"
+        >
+          {placedChords.length === 0 && !draggingFrom && (
+            <div className="flex-1 flex items-center justify-center py-4 text-xs text-surface-400 italic">
+              {t('chords.dragHint', 'Drag chords here or click palette to add')}
+            </div>
+          )}
+
+          {placedChords.length === 0 && draggingFrom && (
+            <>
+              {/* Ghost preview when timeline is empty */}
+              <div className="flex flex-col items-center px-3 py-2 rounded-lg border-2 border-dashed
+                border-accent-500/40 bg-accent-500/10 min-w-[56px] animate-pulse">
+                <span className="text-xs font-bold text-accent-400/60">?</span>
+                <span className="text-[9px] text-accent-400/40 mt-1">Drop here</span>
+              </div>
+            </>
+          )}
 
           {resolvedPlaced.map((chord, i) => {
             const pc = placedChords[i];
             if (!pc) return null;
             const isDragging = draggingIndex === i;
+            const isPlaying = playingIdx === i;
+            const chordBeats = pc.beats ?? value.beatsPerChord;
+            // Show ghost BEFORE this chord if dropIndex matches
+            const showGhostBefore = dropIndex === i && draggingFrom;
+            // If dragging from timeline, skip ghost at source position
+            const skipGhost = draggingFrom === 'timeline' && draggingIndex === i;
+
             return (
               <React.Fragment key={pc.id}>
+                {/* Ghost preview — translucent blue block that shifts existing chords */}
+                {showGhostBefore && !skipGhost && (
+                  <div className="flex flex-col items-center px-3 py-2 rounded-lg border-2 border-dashed
+                    border-accent-500/50 bg-accent-500/10 min-w-[56px] shrink-0 transition-all duration-150">
+                    <span className="text-xs font-bold text-accent-400/60">
+                      {draggingFrom === 'palette' ? '?' : resolvedPlaced[draggingIndex!]?.roman || '?'}
+                    </span>
+                    <span className="text-[9px] text-accent-400/40 mt-1">
+                      {draggingFrom === 'palette' ? 'New' : resolvedPlaced[draggingIndex!]?.name || ''}
+                    </span>
+                  </div>
+                )}
+
                 <div
+                  data-chord-idx={i}
                   draggable
                   onDragStart={e => onTimelineDragStart(e, i)}
                   onDragEnd={onDragEnd}
                   onClick={() => handlePreviewChord(chord.notes)}
                   className={`relative flex flex-col items-center px-3 py-2 rounded-lg border
-                    min-w-[56px] group transition-all select-none cursor-grab active:cursor-grabbing
-                    ${isDragging ? 'opacity-30 scale-95' : 'hover:border-accent-500/50 hover:bg-surface-100'}
-                    bg-surface-100 border-surface-300`}
+                    min-w-[56px] group select-none cursor-grab active:cursor-grabbing shrink-0
+                    transition-all duration-150
+                    ${isDragging ? 'opacity-20 scale-90' : ''}
+                    ${isPlaying
+                      ? 'border-accent-500 bg-accent-500/15 shadow-[0_0_12px_theme(colors.accent.500/30)] scale-105'
+                      : 'hover:border-accent-500/50 hover:bg-surface-100 bg-surface-100 border-surface-300'
+                    }`}
                 >
                   {/* X delete */}
                   <button
@@ -394,8 +507,25 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
                     {formatMode === 'roman' ? chord.name : chord.roman}
                   </span>
 
+                  {/* Beat count badge */}
+                  <div className="flex items-center gap-0.5 mt-0.5">
+                    <button
+                      onClick={e => { e.stopPropagation(); setChordBeats(i, chordBeats - 0.5); }}
+                      className="w-3 h-3 rounded flex items-center justify-center text-surface-400
+                        hover:text-accent-400 hover:bg-accent-500/10 transition-colors text-[8px]"
+                    >−</button>
+                    <span className="text-[8px] font-mono text-surface-400 min-w-[18px] text-center">
+                      {chordBeats}b
+                    </span>
+                    <button
+                      onClick={e => { e.stopPropagation(); setChordBeats(i, chordBeats + 0.5); }}
+                      className="w-3 h-3 rounded flex items-center justify-center text-surface-400
+                        hover:text-accent-400 hover:bg-accent-500/10 transition-colors text-[8px]"
+                    >+</button>
+                  </div>
+
                   {/* Octave control */}
-                  <div className="flex items-center gap-0.5 mt-1">
+                  <div className="flex items-center gap-0.5 mt-0.5">
                     <button
                       onClick={e => { e.stopPropagation(); setOctaveShift(i, pc.octaveShift - 1); }}
                       disabled={pc.octaveShift <= -2}
@@ -421,14 +551,20 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
                     </button>
                   </div>
                 </div>
-                {renderDropZone(i + 1)}
               </React.Fragment>
             );
           })}
 
-          {placedChords.length === 0 && (
-            <div className="flex-1 flex items-center justify-center py-4 text-xs text-surface-400 italic">
-              {t('chords.dragHint', 'Drag chords here or click palette to add')}
+          {/* Ghost at end of timeline */}
+          {dropIndex === placedChords.length && draggingFrom && (
+            <div className="flex flex-col items-center px-3 py-2 rounded-lg border-2 border-dashed
+              border-accent-500/50 bg-accent-500/10 min-w-[56px] shrink-0 transition-all duration-150">
+              <span className="text-xs font-bold text-accent-400/60">
+                {draggingFrom === 'palette' ? '?' : resolvedPlaced[draggingIndex!]?.roman || '?'}
+              </span>
+              <span className="text-[9px] text-accent-400/40 mt-1">
+                {draggingFrom === 'palette' ? 'New' : resolvedPlaced[draggingIndex!]?.name || ''}
+              </span>
             </div>
           )}
         </div>
@@ -503,6 +639,15 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
           <ChevronDown className={`w-3 h-3 transition-transform ${showPresets ? 'rotate-180' : ''}`} />
         </button>
 
+        <button
+          onClick={() => setShowSequences(!showSequences)}
+          className="flex items-center gap-1 px-2.5 py-1.5 rounded-lg text-xs font-medium
+            bg-surface-100 text-surface-500 border border-surface-300 hover:bg-surface-200 transition-colors"
+          title={t('chords.sequences', 'Saved Sequences')}
+        >
+          <FolderOpen className="w-3 h-3" />
+        </button>
+
         {onApply && (
           <button
             onClick={handleApply}
@@ -555,12 +700,70 @@ export default function ChordEditor({ value, onChange, onApply }: ChordEditorPro
         </div>
       )}
 
+      {/* ── Saved Sequences Panel ────────── */}
+      {showSequences && (
+        <div className="rounded-xl border border-surface-300 bg-surface-50 overflow-hidden animate-scale-in">
+          <div className="flex items-center gap-2 px-3 py-2 border-b border-surface-200">
+            <input
+              type="text"
+              value={sequenceName}
+              onChange={e => setSequenceName(e.target.value)}
+              placeholder={t('chords.sequenceName', 'Sequence name…')}
+              className="flex-1 min-w-0 px-2 py-1 text-xs rounded-lg bg-surface-100 border border-surface-300
+                text-surface-800 placeholder-surface-400 focus:outline-none focus:ring-1 focus:ring-accent-500"
+            />
+            <button
+              onClick={saveSequence}
+              disabled={!sequenceName.trim() || placedChords.length === 0}
+              className="flex items-center gap-1 px-2 py-1 rounded-lg text-xs font-medium
+                bg-accent-500 text-white hover:bg-accent-600 disabled:opacity-40 disabled:cursor-not-allowed transition-colors"
+            >
+              <Save className="w-3 h-3" />
+              {t('chords.save', 'Save')}
+            </button>
+          </div>
+          <div className="max-h-48 overflow-y-auto p-2 space-y-1">
+            {savedSequences.length === 0 ? (
+              <p className="text-xs text-surface-400 text-center py-4">
+                {t('chords.noSequences', 'No saved sequences yet')}
+              </p>
+            ) : (
+              savedSequences.map(seq => (
+                <div
+                  key={seq.name}
+                  className="flex items-center gap-2 px-2.5 py-2 rounded-lg hover:bg-surface-100 transition-colors group"
+                >
+                  <button
+                    onClick={() => loadSequence(seq)}
+                    className="flex-1 min-w-0 text-left"
+                  >
+                    <p className="text-xs font-medium text-surface-800 truncate">{seq.name}</p>
+                    <p className="text-[10px] text-surface-500 truncate">
+                      {seq.key} {seq.scale} · {seq.bpm} BPM · {seq.chords.length} chords
+                    </p>
+                  </button>
+                  <button
+                    onClick={() => deleteSequence(seq.name)}
+                    className="p-1 rounded text-surface-400 hover:text-red-500 hover:bg-red-50
+                      opacity-0 group-hover:opacity-100 transition-all"
+                    title={t('chords.delete', 'Delete')}
+                  >
+                    <Trash2 className="w-3 h-3" />
+                  </button>
+                </div>
+              ))
+            )}
+          </div>
+        </div>
+      )}
+
       {/* ── Piano Roll Modal ────────── */}
       <PianoRollModal
         isOpen={showPianoRoll}
         onClose={() => setShowPianoRoll(false)}
         onAddChord={handlePianoRollAdd}
         engine={getEngine()}
+        bpm={value.bpm}
       />
     </div>
   );

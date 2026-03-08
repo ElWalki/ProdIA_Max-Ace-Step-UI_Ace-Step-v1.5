@@ -5,7 +5,7 @@ import CollapsibleSection from '../ui/CollapsibleSection';
 import SliderField from '../ui/SliderField';
 import SelectField from '../ui/SelectField';
 import ToggleField from '../ui/ToggleField';
-import AudioSections, { AudioHistoryItem } from './AudioSections';
+import AudioSections, { AudioHistoryItem, AudioTab } from './AudioSections';
 import ChordEditor from './ChordEditor';
 import SectionControls, { SECTION_TAGS } from './SectionControls';
 import LoraManager from './LoraManager';
@@ -239,7 +239,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   const [micTarget, setMicTarget] = useState<'reference' | 'cover' | 'vocal'>('vocal');
 
   // Audio tab control (lifted from AudioSections)
-  const [audioTab, setAudioTab] = useState<'reference' | 'cover' | 'vocal'>('reference');
+  const [audioTab, setAudioTab] = useState<AudioTab>('reference');
 
   // Full-panel drag & drop
   const [panelDragging, setPanelDragging] = useState(false);
@@ -525,7 +525,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
     dragCounterRef.current = 0;
     setPanelDragging(false);
     // Route to active audio tab
-    const target = audioTab === 'reference' ? 'reference' as const : audioTab === 'cover' ? 'source' as const : 'vocal' as const;
+    const target = audioTab === 'reference' ? 'reference' as const : audioTab === 'vocal' ? 'vocal' as const : 'source' as const;
     // Check for song drag from workspace
     const songUrl = e.dataTransfer.getData('text/song-audio-url');
     const songTitle = e.dataTransfer.getData('text/song-title');
@@ -559,8 +559,8 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
       set('taskType', 'repaint');
       setAudioTab('cover');
     } else {
-      set('taskType', 'text2music');
-      setAudioTab('reference');
+      set('taskType', 'complete');
+      setAudioTab('extend');
     }
   }, [set]);
 
@@ -628,6 +628,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
     { value: 'text2music', label: 'Text to Music' },
     { value: 'cover', label: 'Cover' },
     { value: 'repaint', label: 'Repaint' },
+    { value: 'complete', label: 'Extend (Complete)' },
   ];
 
   return (
@@ -879,7 +880,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
           <button
             onClick={() => handleWorkflowMode('extend')}
             className={`flex items-center gap-1.5 flex-1 px-2.5 py-1.5 rounded-lg text-[11px] font-medium border transition-all ${
-              params.taskType === 'text2music' && params.referenceAudioUrl
+              params.taskType === 'complete'
                 ? 'bg-emerald-500/15 border-emerald-500/40 text-emerald-400'
                 : 'bg-surface-100 border-surface-300/40 text-surface-500 hover:border-emerald-500/30 hover:text-emerald-400'
             }`}
@@ -888,6 +889,41 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
             {t('workflow.extend', 'Extend')}
           </button>
         </div>
+
+        {/* Audio Sections — always visible in advanced mode */}
+        {params.customMode && (
+          <AudioSections
+            referenceAudioUrl={params.referenceAudioUrl}
+            referenceAudioTitle={params.referenceAudioTitle}
+            onReferenceUpload={f => handleAudioSectionUpload(f, 'reference')}
+            onReferenceClear={() => { set('referenceAudioUrl', undefined); set('referenceAudioTitle', undefined); }}
+            onReferenceSongDrop={(url, title) => { addToAudioHistory(url, title); set('referenceAudioUrl', url); set('referenceAudioTitle', title); }}
+            coverAudioUrl={params.sourceAudioUrl}
+            coverAudioTitle={params.sourceAudioTitle}
+            onCoverUpload={f => handleAudioSectionUpload(f, 'source')}
+            onCoverClear={() => { set('sourceAudioUrl', undefined); set('sourceAudioTitle', undefined); set('taskType', undefined); }}
+            onCoverSongDrop={(url, title) => { addToAudioHistory(url, title); set('sourceAudioUrl', url); set('sourceAudioTitle', title); set('taskType', 'cover'); }}
+            vocalAudioUrl={params.vocalAudioUrl}
+            vocalAudioTitle={params.vocalAudioTitle}
+            onVocalUpload={f => handleAudioSectionUpload(f, 'vocal')}
+            onVocalClear={() => { set('vocalAudioUrl', undefined); set('vocalAudioTitle', undefined); }}
+            onVocalSongDrop={(url, title) => { addToAudioHistory(url, title); set('vocalAudioUrl', url); set('vocalAudioTitle', title); }}
+            onExtendUpload={f => { handleAudioSectionUpload(f, 'source'); set('taskType', 'complete'); }}
+            onExtendClear={() => { set('sourceAudioUrl', undefined); set('sourceAudioTitle', undefined); set('taskType', undefined); }}
+            onExtendSongDrop={(url, title) => { addToAudioHistory(url, title); set('sourceAudioUrl', url); set('sourceAudioTitle', title); set('taskType', 'complete'); }}
+            onRecord={() => { setMicTarget('vocal'); setShowMicRecorder(true); }}
+            activeTab={audioTab}
+            onActiveTabChange={setAudioTab}
+            taskType={params.taskType}
+            audioCoverStrength={params.audioCoverStrength ?? 0.5}
+            onAudioCoverStrengthChange={v => set('audioCoverStrength', v)}
+            repaintingStart={params.repaintingStart ?? 0}
+            repaintingEnd={params.repaintingEnd ?? 1}
+            onRepaintingChange={(s, e) => { set('repaintingStart', s); set('repaintingEnd', e); }}
+            audioHistory={audioHistory}
+            onHistorySelect={handleHistorySelect}
+          />
+        )}
 
         {/* Simple mode */}
         {!params.customMode && (
@@ -946,42 +982,12 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                 placeholder={t('create.titlePlaceholder')}
                 className="w-full bg-surface-100 border border-surface-300 rounded-md px-2 py-1.5 text-sm text-surface-900 placeholder:text-surface-400"
               />
-              <input
-                type="text"
+              <textarea
                 value={params.style}
                 onChange={e => set('style', e.target.value)}
                 placeholder={t('create.stylePlaceholder')}
-                className="w-full bg-surface-100 border border-surface-300 rounded-md px-2 py-1.5 text-sm text-surface-900 placeholder:text-surface-400"
-              />
-              <textarea
-                value={params.prompt}
-                onChange={e => set('prompt', e.target.value)}
-                placeholder={t('create.promptPlaceholder')}
                 rows={2}
-                className="w-full bg-surface-100 border border-surface-300 rounded-md px-2 py-1.5 text-sm text-surface-900 placeholder:text-surface-400 resize-y min-h-[50px] max-h-[300px]"
-              />
-              {/* Audio Sections (Reference / Cover / Vocal) */}
-              <AudioSections
-                referenceAudioUrl={params.referenceAudioUrl}
-                referenceAudioTitle={params.referenceAudioTitle}
-                onReferenceUpload={f => handleAudioSectionUpload(f, 'reference')}
-                onReferenceClear={() => { set('referenceAudioUrl', undefined); set('referenceAudioTitle', undefined); }}
-                onReferenceSongDrop={(url, title) => { addToAudioHistory(url, title); set('referenceAudioUrl', url); set('referenceAudioTitle', title); }}
-                coverAudioUrl={params.sourceAudioUrl}
-                coverAudioTitle={params.sourceAudioTitle}
-                onCoverUpload={f => handleAudioSectionUpload(f, 'source')}
-                onCoverClear={() => { set('sourceAudioUrl', undefined); set('sourceAudioTitle', undefined); set('taskType', undefined); }}
-                onCoverSongDrop={(url, title) => { addToAudioHistory(url, title); set('sourceAudioUrl', url); set('sourceAudioTitle', title); set('taskType', 'cover'); }}
-                vocalAudioUrl={params.vocalAudioUrl}
-                vocalAudioTitle={params.vocalAudioTitle}
-                onVocalUpload={f => handleAudioSectionUpload(f, 'vocal')}
-                onVocalClear={() => { set('vocalAudioUrl', undefined); set('vocalAudioTitle', undefined); }}
-                onVocalSongDrop={(url, title) => { addToAudioHistory(url, title); set('vocalAudioUrl', url); set('vocalAudioTitle', title); }}
-                onRecord={() => { setMicTarget('vocal'); setShowMicRecorder(true); }}
-                activeTab={audioTab}
-                onActiveTabChange={setAudioTab}
-                audioHistory={audioHistory}
-                onHistorySelect={handleHistorySelect}
+                className="w-full bg-surface-100 border border-surface-300 rounded-md px-2 py-1.5 text-sm text-surface-900 placeholder:text-surface-400 resize-y min-h-[40px] max-h-[200px]"
               />
               {/* Lyrics with colored overlay */}
               <div className="relative" ref={lyricsContainerRef}>
