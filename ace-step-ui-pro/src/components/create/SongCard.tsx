@@ -39,9 +39,9 @@ function generateBars(id: string, count: number): number[] {
   return bars;
 }
 
-const BAR_COUNT = 200;
+const BAR_COUNT = 160;
 
-/** Inline mini waveform – dense DAW-like bars, seekable via click/drag */
+/** Inline mini waveform – professional DAW-style mirrored bars, seekable via click/drag */
 function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
   songId: string; isPlaying: boolean; isCurrent: boolean;
   audioRef?: React.RefObject<HTMLAudioElement>;
@@ -95,40 +95,70 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
       ctx.clearRect(0, 0, w, h);
 
       const bars = barsRef.current;
-      const gap = 0.5;
-      const barW = (w - gap * (bars.length - 1)) / bars.length;
+      const gap = 1;
+      const barW = Math.max(1, (w - gap * (bars.length - 1)) / bars.length);
+      const midY = h / 2;
+      const maxHalf = h * 0.44;
+
+      // Progress — show position even when paused if this is the current song
       let progress = 0;
-      if (isCurrent && isPlaying && audioRef?.current) {
+      if (isCurrent && audioRef?.current) {
         const a = audioRef.current;
         if (a.duration && isFinite(a.duration)) progress = a.currentTime / a.duration;
       }
 
       const isLight = document.documentElement.classList.contains('light');
+      const hasRoundRect = typeof ctx.roundRect === 'function';
+
+      // Center reference line
+      ctx.fillStyle = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)';
+      ctx.fillRect(0, midY, w, 0.5);
+
+      // Mirrored bars
+      const playedColor = isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,92,246,0.85)';
+      const mutedColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)';
+      const r = Math.min(barW * 0.4, 1.5);
+
       bars.forEach((amp, i) => {
         const x = i * (barW + gap);
-        const barH = Math.max(1, amp * h * 0.95);
-        const y = (h - barH) / 2;
-        const barProgress = (i + 0.5) / bars.length;
-        if (isCurrent && isPlaying && barProgress <= progress) {
-          ctx.fillStyle = '#a855f7';
+        const halfH = Math.max(0.5, amp * maxHalf);
+        const barPct = (i + 0.5) / bars.length;
+        ctx.fillStyle = (isCurrent && progress > 0 && barPct <= progress) ? playedColor : mutedColor;
+
+        if (hasRoundRect) {
+          // Upper half — rounded top
+          ctx.beginPath();
+          ctx.roundRect(x, midY - halfH, barW, halfH, [r, r, 0, 0]);
+          ctx.fill();
+          // Lower half — rounded bottom
+          ctx.beginPath();
+          ctx.roundRect(x, midY, barW, halfH, [0, 0, r, r]);
+          ctx.fill();
         } else {
-          ctx.fillStyle = isLight ? '#b3b8cc' : '#3f3f4d';
+          ctx.fillRect(x, midY - halfH, barW, halfH);
+          ctx.fillRect(x, midY, barW, halfH);
         }
-        ctx.fillRect(x, y, Math.max(0.5, barW), barH);
       });
 
-      if (isCurrent && isPlaying) {
+      // Playhead line
+      if (isCurrent && progress > 0) {
+        const px = progress * w;
+        ctx.fillStyle = isLight ? 'rgba(99,102,241,0.9)' : 'rgba(255,255,255,0.6)';
+        ctx.fillRect(Math.round(px) - 0.5, 0, 1, h);
+      }
+
+      if (isPlaying) {
         rafRef.current = requestAnimationFrame(draw);
       }
     };
 
     draw();
-    if (isCurrent && isPlaying) {
+    if (isPlaying) {
       rafRef.current = requestAnimationFrame(draw);
     }
 
     const audio = audioRef?.current;
-    const onTime = () => { if (isCurrent && !isPlaying) draw(); };
+    const onTime = () => { if (isCurrent) draw(); };
     audio?.addEventListener('timeupdate', onTime);
 
     return () => {
@@ -166,7 +196,7 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
   return (
     <canvas
       ref={canvasRef}
-      className={`w-full h-6 rounded ${isCurrent ? 'cursor-pointer' : 'cursor-default'}`}
+      className={`w-full h-8 rounded-md ${isCurrent ? 'cursor-pointer' : 'cursor-default'}`}
       onMouseDown={handleSeekStart}
     />
   );

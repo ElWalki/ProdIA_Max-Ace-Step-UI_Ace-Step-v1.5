@@ -50,7 +50,7 @@ export default function WaveformPlayer({
     return () => { cancelled = true; ac.close().catch(() => {}); };
   }, [src]);
 
-  // Draw waveform
+  // Draw waveform — professional DAW-style mirrored bars
   useEffect(() => {
     const canvas = canvasRef.current;
     if (!canvas || !peaks || peaks.length === 0) return;
@@ -62,37 +62,73 @@ export default function WaveformPlayer({
     canvas.height = h * dpr;
     c.scale(dpr, dpr);
     c.clearRect(0, 0, w, h);
-    const barW = w / peaks.length;
+
+    const gap = 1;
+    const barW = Math.max(1, (w - gap * (peaks.length - 1)) / peaks.length);
+    const midY = h / 2;
+    const maxHalf = h * 0.44;
+    const isLight = document.documentElement.classList.contains('light');
+    const hasRoundRect = typeof c.roundRect === 'function';
+    const r = Math.min(barW * 0.4, 1.5);
 
     // Region highlight background
     if (regionMode) {
-      c.fillStyle = 'rgba(168,85,247,0.07)';
+      c.fillStyle = isLight ? 'rgba(99,102,241,0.06)' : 'rgba(139,92,246,0.06)';
       c.fillRect(regionStart * w, 0, (regionEnd - regionStart) * w, h);
     }
 
-    // Bars
+    // Center reference line
+    c.fillStyle = isLight ? 'rgba(0,0,0,0.05)' : 'rgba(255,255,255,0.03)';
+    c.fillRect(0, midY, w, 0.5);
+
+    // Colors
+    const playedColor = isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,92,246,0.85)';
+    const regionActiveColor = isLight ? 'rgba(99,102,241,0.85)' : 'rgba(168,85,247,0.9)';
+    const regionColor = isLight ? 'rgba(99,102,241,0.3)' : 'rgba(168,85,247,0.3)';
+    const mutedColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)';
+
+    // Mirrored bars
     for (let i = 0; i < peaks.length; i++) {
-      const x = i * barW + 0.5;
-      const barH = Math.max(2, peaks[i] * h * 0.8);
+      const x = i * (barW + gap);
+      const halfH = Math.max(0.5, peaks[i] * maxHalf);
       const pct = (i + 0.5) / peaks.length;
+
       if (regionMode && pct >= regionStart && pct <= regionEnd) {
-        c.fillStyle = pct <= progress ? 'rgba(168,85,247,0.9)' : 'rgba(168,85,247,0.35)';
-      } else if (pct <= progress) {
-        c.fillStyle = 'rgba(139,92,246,0.85)';
+        c.fillStyle = pct <= progress ? regionActiveColor : regionColor;
+      } else if (progress > 0 && pct <= progress) {
+        c.fillStyle = playedColor;
       } else {
-        c.fillStyle = document.documentElement.classList.contains('light') ? 'rgba(100,110,140,0.35)' : 'rgba(148,163,184,0.28)';
+        c.fillStyle = mutedColor;
       }
-      c.fillRect(x, (h - barH) / 2, barW - 1, barH);
+
+      if (hasRoundRect) {
+        c.beginPath();
+        c.roundRect(x, midY - halfH, barW, halfH, [r, r, 0, 0]);
+        c.fill();
+        c.beginPath();
+        c.roundRect(x, midY, barW, halfH, [0, 0, r, r]);
+        c.fill();
+      } else {
+        c.fillRect(x, midY - halfH, barW, halfH);
+        c.fillRect(x, midY, barW, halfH);
+      }
+    }
+
+    // Playhead
+    if (progress > 0) {
+      const px = progress * w;
+      c.fillStyle = isLight ? 'rgba(99,102,241,0.9)' : 'rgba(255,255,255,0.6)';
+      c.fillRect(Math.round(px) - 0.5, 0, 1, h);
     }
 
     // Region handles
     if (regionMode) {
       for (const pos of [regionStart, regionEnd]) {
         const x = pos * w;
-        c.fillStyle = 'rgba(168,85,247,0.85)';
+        c.fillStyle = isLight ? 'rgba(99,102,241,0.85)' : 'rgba(168,85,247,0.85)';
         c.fillRect(x - 1, 0, 2, h);
         c.beginPath();
-        c.arc(x, h / 2, 4, 0, Math.PI * 2);
+        c.arc(x, midY, 4, 0, Math.PI * 2);
         c.fill();
       }
     }

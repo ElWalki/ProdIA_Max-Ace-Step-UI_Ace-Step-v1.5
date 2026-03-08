@@ -100,10 +100,13 @@ export default function App() {
         setToast({ message: msg, type: 'error' });
       }
     };
+    const onEnded = () => { setIsPlaying(false); };
     audio.addEventListener('error', onError);
+    audio.addEventListener('ended', onEnded);
 
     return () => {
       audio.removeEventListener('error', onError);
+      audio.removeEventListener('ended', onEnded);
       audio.pause();
       audio.src = '';
     };
@@ -142,6 +145,10 @@ export default function App() {
       else { audio.pause(); setIsPlaying(false); }
       return;
     }
+
+    // Stop current playback cleanly before switching
+    audio.pause();
+    audio.currentTime = 0;
 
     setCurrentSong(song);
 
