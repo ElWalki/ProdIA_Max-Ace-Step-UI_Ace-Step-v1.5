@@ -631,6 +631,12 @@ export default function App() {
         isLiked={currentSong?.liked}
         onToggleLike={currentSong ? () => toggleLike(currentSong.id) : undefined}
         onClickTitle={currentSong ? () => setDetailSong(currentSong) : undefined}
+        onExtractStems={currentSong ? () => setStemSong(currentSong) : undefined}
+        onReusePrompt={currentSong?.generationParams ? () => {
+          setReuseParams({ ...currentSong.generationParams! });
+          setCurrentView('create');
+          showToast(t('common.promptReused', 'Prompt loaded into creator'), 'success');
+        } : undefined}
       />
 
       <FloatingAssistant isOpen={assistantOpen} onToggle={() => setAssistantOpen(v => !v)} />

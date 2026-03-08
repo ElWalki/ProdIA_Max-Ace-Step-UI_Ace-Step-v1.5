@@ -4,8 +4,28 @@ import {
   Play, Pause, SkipBack, SkipForward, Volume2, VolumeX, Volume1,
   Shuffle, Repeat, Repeat1, Download, Heart, ChevronUp, ChevronDown,
   Music, Cpu, MessageSquare, Mic, Clock, Disc3,
+  Share2, Scissors, Copy,
 } from 'lucide-react';
 import type { Song } from '../../types';
+
+/* ── Animated glow bar CSS (injected once) ── */
+const glowStyleId = 'playerbar-glow-css';
+if (typeof document !== 'undefined' && !document.getElementById(glowStyleId)) {
+  const style = document.createElement('style');
+  style.id = glowStyleId;
+  style.textContent = `
+    @keyframes pb-shimmer {
+      0%   { filter: hue-rotate(0deg)   brightness(1)   drop-shadow(0 0 4px currentColor); }
+      25%  { filter: hue-rotate(15deg)  brightness(1.2) drop-shadow(0 0 8px currentColor); }
+      50%  { filter: hue-rotate(-10deg) brightness(1.1) drop-shadow(0 0 12px currentColor); }
+      75%  { filter: hue-rotate(8deg)   brightness(1.3) drop-shadow(0 0 6px currentColor); }
+      100% { filter: hue-rotate(0deg)   brightness(1)   drop-shadow(0 0 4px currentColor); }
+    }
+    .pb-glow-anim { animation: pb-shimmer 4s ease-in-out infinite; }
+    .pb-glow-idle  { filter: brightness(0.7); animation: none; }
+  `;
+  document.head.appendChild(style);
+}
 
 interface PlayerBarProps {
   song: Song | null;
@@ -20,11 +40,15 @@ interface PlayerBarProps {
   onToggleLike?: () => void;
   onClickTitle?: () => void;
   onAddToPlaylist?: () => void;
+  onExtractStems?: () => void;
+  onReusePrompt?: () => void;
+  onShare?: () => void;
 }
 
 export default memo(function PlayerBar({
   song, songs, isPlaying, onPlayPause, onNext, onPrevious,
   audioRef, onSongEnd, isLiked, onToggleLike, onClickTitle, onAddToPlaylist,
+  onExtractStems, onReusePrompt, onShare,
 }: PlayerBarProps) {
   const { t } = useTranslation();
   const [progress, setProgress] = useState(0);
@@ -38,7 +62,7 @@ export default memo(function PlayerBar({
   const [shuffle, setShuffle] = useState(false);
   const [repeatMode, setRepeatMode] = useState<'none' | 'all' | 'one'>('none');
   const [expanded, setExpanded] = useState(false);
-  const progressRef = useRef<HTMLDivElement>(null);
+  const glowRef = useRef<HTMLDivElement>(null);
   const animRef = useRef<number>(0);
   const seekingRef = useRef(false);
   const isPlayingRef = useRef(isPlaying);
@@ -107,9 +131,9 @@ export default memo(function PlayerBar({
     localStorage.setItem('ace_volume', String(volume));
   }, [volume, isMuted, audioRef]);
 
-  // Drag-to-seek on progress bar
-  const handleSeekMouseDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
-    const bar = progressRef.current;
+  // Drag-to-seek on the TOP GLOW BAR
+  const handleGlowSeekDown = useCallback((e: React.MouseEvent<HTMLDivElement>) => {
+    const bar = glowRef.current;
     const audio = audioRef.current;
     if (!bar || !audio || !audio.duration) return;
     e.preventDefault();
@@ -144,6 +168,13 @@ export default memo(function PlayerBar({
     a.click();
   }, [song]);
 
+  const handleShare = useCallback(() => {
+    if (onShare) { onShare(); return; }
+    if (!song) return;
+    const text = `🎵 ${song.title || 'Untitled'}${song.style ? ` — ${song.style}` : ''}`;
+    if (navigator.clipboard) navigator.clipboard.writeText(text);
+  }, [song, onShare]);
+
   const cycleRepeat = useCallback(() => {
     setRepeatMode(p => p === 'none' ? 'all' : p === 'all' ? 'one' : 'none');
   }, []);
@@ -166,23 +197,25 @@ export default memo(function PlayerBar({
       <div
         className="absolute bottom-full left-0 right-0 transition-all duration-500 ease-out origin-bottom"
         style={{
-          maxHeight: expanded ? '60vh' : '0px',
+          maxHeight: expanded ? '65vh' : '0px',
           opacity: expanded ? 1 : 0,
           pointerEvents: expanded ? 'auto' : 'none',
           transform: expanded ? 'translateY(0)' : 'translateY(16px)',
         }}
       >
         <div
-          className="mx-4 rounded-t-2xl border border-b-0 border-surface-200/30 overflow-hidden"
+          className="mx-4 rounded-t-2xl border border-b-0 border-white/10 overflow-hidden"
           style={{
-            background: 'linear-gradient(180deg, var(--color-surface-50) 0%, var(--color-surface-100) 100%)',
-            boxShadow: '0 -8px 40px rgba(0,0,0,0.25)',
+            background: 'color-mix(in srgb, var(--color-surface-50) 78%, transparent)',
+            backdropFilter: 'blur(24px) saturate(1.4)',
+            WebkitBackdropFilter: 'blur(24px) saturate(1.4)',
+            boxShadow: '0 -8px 40px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.06)',
           }}
         >
           {/* Header row: Cover + Title + Actions */}
           <div className="flex items-start gap-4 p-5 pb-3">
             {/* Large cover */}
-            <div className="w-20 h-20 rounded-xl bg-surface-200 flex-shrink-0 overflow-hidden shadow-lg">
+            <div className="w-20 h-20 rounded-xl bg-surface-200 flex-shrink-0 overflow-hidden shadow-lg ring-1 ring-white/10">
               {song.coverUrl ? (
                 <img src={song.coverUrl} alt="" className="w-full h-full object-cover" />
               ) : (
@@ -196,34 +229,44 @@ export default memo(function PlayerBar({
                 <p className="text-xs text-surface-400 mt-1.5 line-clamp-2">{gp.songDescription}</p>
               )}
             </div>
-            {/* Top-right icons (overlaid) */}
-            <div className="flex items-center gap-1 flex-shrink-0">
+            {/* Top-right action icons */}
+            <div className="flex items-center gap-0.5 flex-shrink-0">
               {onToggleLike && (
-                <button onClick={onToggleLike} className="p-2 rounded-lg hover:bg-surface-200/50 transition-colors">
-                  <Heart className={`w-5 h-5 ${isLiked ? 'fill-pink-500 text-pink-500' : 'text-surface-400 hover:text-pink-400'}`} />
-                </button>
+                <ActionBtn onClick={onToggleLike} tip={t('player.like', 'Like')}>
+                  <Heart className={`w-[18px] h-[18px] ${isLiked ? 'fill-pink-500 text-pink-500' : ''}`} />
+                </ActionBtn>
               )}
-              <button onClick={handleDownload} className="p-2 rounded-lg hover:bg-surface-200/50 transition-colors" title={t('player.download')}>
-                <Download className="w-5 h-5 text-surface-400 hover:text-surface-700" />
-              </button>
-              <button
-                onClick={() => setExpanded(false)}
-                className="p-2 rounded-lg hover:bg-surface-200/50 transition-colors"
-              >
-                <ChevronDown className="w-5 h-5 text-surface-400" />
-              </button>
+              <ActionBtn onClick={handleDownload} tip={t('player.download', 'Download')}>
+                <Download className="w-[18px] h-[18px]" />
+              </ActionBtn>
+              <ActionBtn onClick={handleShare} tip={t('player.share', 'Share')}>
+                <Share2 className="w-[18px] h-[18px]" />
+              </ActionBtn>
+              {onExtractStems && (
+                <ActionBtn onClick={onExtractStems} tip={t('player.extractStems', 'Extract Stems')}>
+                  <Scissors className="w-[18px] h-[18px]" />
+                </ActionBtn>
+              )}
+              {onReusePrompt && (
+                <ActionBtn onClick={onReusePrompt} tip={t('player.reusePrompt', 'Reuse Prompt')}>
+                  <Copy className="w-[18px] h-[18px]" />
+                </ActionBtn>
+              )}
+              <ActionBtn onClick={() => setExpanded(false)} tip={t('player.collapse', 'Collapse')}>
+                <ChevronDown className="w-[18px] h-[18px]" />
+              </ActionBtn>
             </div>
           </div>
 
           {/* Two-column content */}
-          <div className="flex gap-4 px-5 pb-4 max-h-[calc(60vh-140px)] overflow-y-auto">
+          <div className="flex gap-4 px-5 pb-4 max-h-[calc(65vh-140px)] overflow-y-auto">
             {/* Left: Lyrics */}
             <div className="flex-1 min-w-0">
               <div className="flex items-center gap-2 mb-2">
                 <MessageSquare className="w-4 h-4 text-accent-400" />
                 <span className="text-xs font-semibold text-surface-500 uppercase tracking-wider">{t('create.lyrics', 'Lyrics')}</span>
               </div>
-              <div className="text-sm text-surface-700 font-mono leading-relaxed whitespace-pre-wrap max-h-[40vh] overflow-y-auto pr-2 scrollbar-thin">
+              <div className="text-sm text-surface-700 font-mono leading-relaxed whitespace-pre-wrap max-h-[45vh] overflow-y-auto pr-2 scrollbar-thin">
                 {song.lyrics || gp?.lyrics || <span className="text-surface-400 italic">{t('player.noLyrics', 'Instrumental')}</span>}
               </div>
             </div>
@@ -292,55 +335,52 @@ export default memo(function PlayerBar({
       {/* ── Compact PlayerBar ── */}
       <div className="px-4 pb-3 pt-1">
         <div
-          className="relative mx-auto rounded-2xl border border-surface-200/30 transition-all duration-300 ease-out"
+          className="relative mx-auto rounded-2xl border border-white/10 transition-all duration-300 ease-out"
           style={{
-            background: 'linear-gradient(180deg, var(--color-surface-100) 0%, var(--color-surface-50) 100%)',
-            boxShadow: '0 -4px 30px rgba(0,0,0,0.3), 0 0 1px rgba(255,255,255,0.05) inset',
+            background: 'color-mix(in srgb, var(--color-surface-50) 68%, transparent)',
+            backdropFilter: 'blur(20px) saturate(1.3)',
+            WebkitBackdropFilter: 'blur(20px) saturate(1.3)',
+            boxShadow: '0 -4px 30px rgba(0,0,0,0.35), inset 0 1px 0 rgba(255,255,255,0.05)',
           }}
         >
-          {/* Glow trail at top edge */}
+          {/* ── Seekable glow trail at top edge ── */}
           <div
-            className="absolute top-0 left-4 right-4 h-[2px] rounded-full"
-            style={{
-              width: `${progress}%`,
-              background: 'linear-gradient(90deg, var(--color-accent-500), var(--color-brand-400))',
-              boxShadow: '0 0 8px var(--color-accent-500), 0 0 20px var(--color-brand-500)',
-            }}
-          />
-
-          {/* Progress bar + time (always visible, thin) */}
-          <div className="px-5 pt-2.5 pb-0">
-            <div className="flex items-center gap-3">
-              <span className="text-[10px] text-surface-500 tabular-nums w-9 text-right select-none">{fmt(currentTime)}</span>
-              <div
-                ref={progressRef}
-                className="flex-1 h-[4px] bg-surface-200/40 rounded-full cursor-pointer relative group"
-                onMouseDown={handleSeekMouseDown}
-              >
-                <div
-                  className="absolute inset-y-0 left-0 rounded-full transition-[width] duration-75"
-                  style={{
-                    width: `${progress}%`,
-                    background: 'linear-gradient(90deg, var(--color-accent-500), var(--color-brand-400))',
-                  }}
-                />
-                <div
-                  className="absolute top-1/2 w-3 h-3 rounded-full bg-white shadow-lg shadow-accent-500/40 opacity-0 group-hover:opacity-100 transition-opacity"
-                  style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
-                />
-              </div>
-              <span className="text-[10px] text-surface-500 tabular-nums w-9 select-none">{fmt(duration)}</span>
-            </div>
+            ref={glowRef}
+            className="absolute -top-[2px] left-4 right-4 h-[10px] cursor-pointer z-10 group"
+            onMouseDown={handleGlowSeekDown}
+          >
+            {/* Track background (subtle, visible on hover) */}
+            <div className="absolute inset-x-0 top-[4px] h-[2px] rounded-full bg-white/10 group-hover:bg-white/20 transition-colors" />
+            {/* Filled progress with animated glow */}
+            <div
+              className={`absolute top-[4px] left-0 h-[2px] rounded-full transition-[width] duration-75 ${isPlaying ? 'pb-glow-anim' : 'pb-glow-idle'}`}
+              style={{
+                width: `${progress}%`,
+                background: 'linear-gradient(90deg, var(--color-accent-500), var(--color-brand-400))',
+                boxShadow: isPlaying
+                  ? '0 0 6px var(--color-accent-500), 0 0 14px var(--color-brand-500), 0 0 24px var(--color-accent-400)'
+                  : '0 0 4px var(--color-accent-500)',
+                color: 'var(--color-accent-400)',
+              }}
+            />
+            {/* Seek thumb (appears on hover) */}
+            <div
+              className="absolute top-[5px] w-[10px] h-[10px] rounded-full bg-white shadow-[0_0_8px_var(--color-accent-400)] opacity-0 group-hover:opacity-100 transition-opacity pointer-events-none"
+              style={{ left: `${progress}%`, transform: 'translate(-50%, -50%)' }}
+            />
           </div>
 
           {/* Main compact row */}
           <div className="flex items-center h-[56px] px-4 gap-3">
+            {/* Time current */}
+            <span className="text-[10px] text-surface-400 tabular-nums w-8 text-right select-none flex-shrink-0">{fmt(currentTime)}</span>
+
             {/* Album art + info */}
             <div
               className="flex items-center gap-3 min-w-0 flex-shrink-0 cursor-pointer select-none"
               onClick={() => setExpanded(e => !e)}
             >
-              <div className="relative w-10 h-10 rounded-xl bg-surface-200 flex-shrink-0 overflow-hidden shadow-md group">
+              <div className="relative w-10 h-10 rounded-xl bg-surface-200 flex-shrink-0 overflow-hidden shadow-md ring-1 ring-white/10 group">
                 {song.coverUrl ? (
                   <img src={song.coverUrl} alt="" className="w-full h-full object-cover" />
                 ) : (
@@ -350,7 +390,7 @@ export default memo(function PlayerBar({
                   <ChevronUp className={`w-4 h-4 text-white transition-transform ${expanded ? 'rotate-180' : ''}`} />
                 </div>
               </div>
-              <div className="min-w-0 max-w-[180px]">
+              <div className="min-w-0 max-w-[160px]">
                 <p
                   className={`text-sm font-semibold text-surface-900 truncate ${onClickTitle ? 'hover:text-accent-400 transition-colors' : ''}`}
                   onClick={e => { if (onClickTitle) { e.stopPropagation(); onClickTitle(); } }}
@@ -362,19 +402,19 @@ export default memo(function PlayerBar({
             </div>
 
             {/* Center controls */}
-            <div className="flex items-center justify-center flex-1 gap-4">
+            <div className="flex items-center justify-center flex-1 gap-3">
               <button
                 onClick={() => setShuffle(p => !p)}
                 className={`p-1 transition-colors ${shuffle ? 'text-accent-400' : 'text-surface-400 hover:text-surface-700'}`}
               >
-                <Shuffle className="w-[18px] h-[18px]" />
+                <Shuffle className="w-[16px] h-[16px]" />
               </button>
               <button onClick={onPrevious} className="p-1 text-surface-400 hover:text-surface-800 transition-colors">
                 <SkipBack className="w-5 h-5" />
               </button>
               <button
                 onClick={onPlayPause}
-                className="w-10 h-10 rounded-full border border-surface-300/50 bg-transparent hover:bg-surface-200/50 flex items-center justify-center transition-all active:scale-95"
+                className="w-10 h-10 rounded-full border border-white/15 bg-white/5 hover:bg-white/10 flex items-center justify-center transition-all active:scale-95 shadow-lg shadow-black/20"
               >
                 {isPlaying ?
                   <Pause className="w-5 h-5 text-surface-900" /> :
@@ -388,39 +428,74 @@ export default memo(function PlayerBar({
                 onClick={cycleRepeat}
                 className={`p-1 transition-colors ${repeatMode !== 'none' ? 'text-accent-400' : 'text-surface-400 hover:text-surface-700'}`}
               >
-                {repeatMode === 'one' ? <Repeat1 className="w-[18px] h-[18px]" /> : <Repeat className="w-[18px] h-[18px]" />}
+                {repeatMode === 'one' ? <Repeat1 className="w-[16px] h-[16px]" /> : <Repeat className="w-[16px] h-[16px]" />}
               </button>
             </div>
 
             {/* Right actions */}
-            <div className="flex items-center gap-1 flex-shrink-0">
-              {/* Inline volume slider */}
+            <div className="flex items-center gap-0.5 flex-shrink-0">
+              {/* Inline volume */}
               <VolumeIcon
-                className="w-4 h-4 text-surface-400 hover:text-surface-700 cursor-pointer flex-shrink-0 transition-colors"
+                className="w-4 h-4 text-surface-400 hover:text-surface-200 cursor-pointer flex-shrink-0 transition-colors"
                 onClick={() => setIsMuted(m => !m)}
               />
               <input
-                type="range"
-                min="0" max="1" step="0.01"
+                type="range" min="0" max="1" step="0.01"
                 value={isMuted ? 0 : volume}
                 onChange={e => { setVolume(parseFloat(e.target.value)); setIsMuted(false); }}
-                className="w-16 h-1 accent-accent-500 flex-shrink-0"
+                className="w-14 h-1 accent-accent-500 flex-shrink-0"
               />
 
+              {/* Highlighted action buttons */}
               {onToggleLike && (
-                <button onClick={onToggleLike} className="p-1.5 transition-colors">
-                  <Heart className={`w-4 h-4 ${isLiked ? 'fill-pink-500 text-pink-500' : 'text-surface-400 hover:text-pink-400'}`} />
+                <button
+                  onClick={onToggleLike}
+                  className={`p-1.5 rounded-lg transition-all ${isLiked ? 'text-pink-500 bg-pink-500/15' : 'text-surface-400 hover:text-pink-400 hover:bg-pink-500/10'}`}
+                  title={t('player.like', 'Like')}
+                >
+                  <Heart className={`w-4 h-4 ${isLiked ? 'fill-pink-500' : ''}`} />
                 </button>
               )}
 
               <button
                 onClick={handleDownload}
-                className="p-1.5 text-surface-400 hover:text-surface-700 transition-colors"
-                title={t('player.download')}
+                className="p-1.5 rounded-lg text-surface-400 hover:text-accent-400 hover:bg-accent-500/10 transition-all"
+                title={t('player.download', 'Download')}
               >
                 <Download className="w-4 h-4" />
               </button>
+
+              <button
+                onClick={handleShare}
+                className="p-1.5 rounded-lg text-surface-400 hover:text-brand-400 hover:bg-brand-500/10 transition-all"
+                title={t('player.share', 'Share')}
+              >
+                <Share2 className="w-4 h-4" />
+              </button>
+
+              {onExtractStems && (
+                <button
+                  onClick={onExtractStems}
+                  className="p-1.5 rounded-lg text-surface-400 hover:text-green-400 hover:bg-green-500/10 transition-all"
+                  title={t('player.extractStems', 'Extract Stems')}
+                >
+                  <Scissors className="w-4 h-4" />
+                </button>
+              )}
+
+              {onReusePrompt && (
+                <button
+                  onClick={onReusePrompt}
+                  className="p-1.5 rounded-lg text-surface-400 hover:text-amber-400 hover:bg-amber-500/10 transition-all"
+                  title={t('player.reusePrompt', 'Reuse Prompt')}
+                >
+                  <Copy className="w-4 h-4" />
+                </button>
+              )}
             </div>
+
+            {/* Time remaining */}
+            <span className="text-[10px] text-surface-400 tabular-nums w-8 select-none flex-shrink-0">{fmt(duration)}</span>
           </div>
         </div>
       </div>
@@ -430,10 +505,22 @@ export default memo(function PlayerBar({
 
 /* ── helper sub-components ── */
 
+function ActionBtn({ onClick, tip, children }: { onClick: () => void; tip: string; children: React.ReactNode }) {
+  return (
+    <button
+      onClick={onClick}
+      className="p-2 rounded-lg text-surface-400 hover:text-surface-200 hover:bg-white/10 transition-all active:scale-95"
+      title={tip}
+    >
+      {children}
+    </button>
+  );
+}
+
 function InfoPill({ label, value }: { label: string; value: string }) {
   return (
     <div className="flex items-center gap-2 text-xs">
-      <span className="px-1.5 py-0.5 rounded bg-surface-200/60 text-surface-500 font-mono text-[10px] uppercase">{label}</span>
+      <span className="px-1.5 py-0.5 rounded bg-white/10 text-surface-400 font-mono text-[10px] uppercase">{label}</span>
       <span className="text-surface-700 truncate">{value}</span>
     </div>
   );
