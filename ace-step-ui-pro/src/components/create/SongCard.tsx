@@ -39,7 +39,7 @@ function generateBars(id: string, count: number): number[] {
   return bars;
 }
 
-const BAR_COUNT = 120;
+const BAR_COUNT = 500;
 
 /** Inline mini waveform – professional DAW-style mirrored bars, seekable via click/drag */
 function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
@@ -66,10 +66,9 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
       canvas.height = h * dpr;
       ctx.scale(dpr, dpr);
 
-      const gap = 1;
-      const barW = Math.max(1, (w - gap * (bars.length - 1)) / bars.length);
+      const barW = w / bars.length;
       const midY = h / 2;
-      const maxHalf = h * 0.44;
+      const maxHalf = h * 0.48;
 
       let progress = 0;
       if (isCurrent && audioRef?.current) {
@@ -78,33 +77,19 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
       }
 
       const isLight = document.documentElement.classList.contains('light');
-      const playedColor = isLight ? 'rgba(99,102,241,0.8)' : 'rgba(139,92,246,0.85)';
-      const mutedColor = isLight ? 'rgba(0,0,0,0.12)' : 'rgba(255,255,255,0.1)';
-      const hasRR = typeof ctx.roundRect === 'function';
-      const r = Math.min(barW * 0.4, 1.5);
+      const playedColor = isLight ? 'rgba(99,102,241,0.85)' : 'rgba(139,92,246,0.9)';
+      const mutedColor = isLight ? 'rgba(0,0,0,0.15)' : 'rgba(255,255,255,0.13)';
 
-      // Center reference line
-      ctx.fillStyle = isLight ? 'rgba(0,0,0,0.04)' : 'rgba(255,255,255,0.025)';
-      ctx.fillRect(0, midY, w, 0.5);
-
-      // Mirrored bars
+      // Dense mirrored columns — raw WAV style
       for (let i = 0; i < bars.length; i++) {
-        const x = i * (barW + gap);
+        const x = Math.round(i * barW);
+        const nextX = Math.round((i + 1) * barW);
+        const colW = Math.max(1, nextX - x);
         const halfH = Math.max(0.5, bars[i] * maxHalf);
         const pct = (i + 0.5) / bars.length;
         ctx.fillStyle = (isCurrent && progress > 0 && pct <= progress) ? playedColor : mutedColor;
-
-        if (hasRR) {
-          ctx.beginPath();
-          ctx.roundRect(x, midY - halfH, barW, halfH, [r, r, 0, 0]);
-          ctx.fill();
-          ctx.beginPath();
-          ctx.roundRect(x, midY, barW, halfH, [0, 0, r, r]);
-          ctx.fill();
-        } else {
-          ctx.fillRect(x, midY - halfH, barW, halfH);
-          ctx.fillRect(x, midY, barW, halfH);
-        }
+        ctx.fillRect(x, midY - halfH, colW, halfH);
+        ctx.fillRect(x, midY, colW, halfH);
       }
 
       // Playhead

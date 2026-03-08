@@ -49,7 +49,7 @@ export default function WaveformPlayer({
       .then(decoded => {
         if (cancelled) return;
         const raw = decoded.getChannelData(0);
-        const bars = 200;
+        const bars = 500;
         const step = Math.floor(raw.length / bars);
         const p: number[] = [];
         for (let i = 0; i < bars; i++) {
@@ -85,7 +85,7 @@ export default function WaveformPlayer({
     const ro = new ResizeObserver(syncSize);
     ro.observe(canvas);
     return () => ro.disconnect();
-  }, []);
+  }, [peaks]);
 
   // Pure draw function — reads from refs, no state dependencies
   const draw = useCallback(() => {
@@ -107,13 +107,10 @@ export default function WaveformPlayer({
     const rEnd = regionEndRef.current;
     const rMode = regionModeRef.current;
 
-    const gap = 1;
-    const barW = Math.max(1, (w - gap * (pk.length - 1)) / pk.length);
+    const barW = Math.max(1, w / pk.length);
     const midY = h / 2;
-    const maxHalf = h * 0.44;
+    const maxHalf = h * 0.48;
     const isLight = document.documentElement.classList.contains('light');
-    const hasRoundRect = typeof c.roundRect === 'function';
-    const r = Math.min(barW * 0.4, 1.5);
 
     // Region highlight background
     if (rMode) {
@@ -131,9 +128,11 @@ export default function WaveformPlayer({
     const regionColor = isLight ? 'rgba(99,102,241,0.3)' : 'rgba(168,85,247,0.3)';
     const mutedColor = isLight ? 'rgba(0,0,0,0.1)' : 'rgba(255,255,255,0.08)';
 
-    // Mirrored bars
+    // Dense mirrored columns — raw WAV style
     for (let i = 0; i < pk.length; i++) {
-      const x = i * (barW + gap);
+      const x = Math.round(i * barW);
+      const nextX = Math.round((i + 1) * barW);
+      const colW = Math.max(1, nextX - x);
       const halfH = Math.max(0.5, pk[i] * maxHalf);
       const pct = (i + 0.5) / pk.length;
 
@@ -145,17 +144,8 @@ export default function WaveformPlayer({
         c.fillStyle = mutedColor;
       }
 
-      if (hasRoundRect) {
-        c.beginPath();
-        c.roundRect(x, midY - halfH, barW, halfH, [r, r, 0, 0]);
-        c.fill();
-        c.beginPath();
-        c.roundRect(x, midY, barW, halfH, [0, 0, r, r]);
-        c.fill();
-      } else {
-        c.fillRect(x, midY - halfH, barW, halfH);
-        c.fillRect(x, midY, barW, halfH);
-      }
+      c.fillRect(x, midY - halfH, colW, halfH);
+      c.fillRect(x, midY, colW, halfH);
     }
 
     // Playhead
