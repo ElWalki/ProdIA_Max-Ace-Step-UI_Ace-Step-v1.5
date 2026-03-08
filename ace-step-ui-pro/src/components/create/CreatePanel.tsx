@@ -12,10 +12,12 @@ import LoraManager from './LoraManager';
 import MicRecorder from './MicRecorder';
 import GpuMiniBar from './GpuMiniBar';
 import QuickParamsPanel from './QuickParamsPanel';
+import StyleDnaPanel from './StyleDnaPanel';
 import {
   GenerationParams, DEFAULT_PARAMS,
   KEY_SIGNATURES, TIME_SIGNATURES, VOCAL_LANGUAGES,
   ChordProgressionState,
+  StyleDna, DEFAULT_STYLE_DNA, buildStyleDnaTags, styleDnaToModelParams,
 } from '../../types';
 import { generateApi } from '../../services/api';
 import { useAuth } from '../../context/AuthContext';
@@ -35,9 +37,10 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   const { token } = useAuth();
   const [params, setParams] = useState<GenerationParams>({ ...DEFAULT_PARAMS });
   const [openSections, setOpenSections] = useState<Record<string, boolean>>({
-    text: true, music: true, voice: false, generation: false,
+    text: true, music: true, voice: false, styleDna: false, generation: false,
     lm: false, audio: false, expert: false,
   });
+  const [styleDna, setStyleDna] = useState<StyleDna>({ ...DEFAULT_STYLE_DNA });
   const [isEnhancing, setIsEnhancing] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
   const srcFileInputRef = useRef<HTMLInputElement>(null);
@@ -334,6 +337,34 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
       }
     }
 
+    // Style DNA injection
+    if (styleDna.enabled) {
+      const dnaTags = buildStyleDnaTags(styleDna);
+      if (dnaTags) {
+        if (finalParams.customMode) {
+          finalParams.style = finalParams.style
+            ? `${finalParams.style}, ${dnaTags}`
+            : dnaTags;
+        } else {
+          finalParams.songDescription = finalParams.songDescription
+            ? `${finalParams.songDescription}, ${dnaTags}`
+            : dnaTags;
+        }
+      }
+      // Apply model-level param overrides from DNA
+      const modelOverrides = styleDnaToModelParams(styleDna);
+      if (modelOverrides.lmRepetitionPenalty !== undefined) {
+        finalParams.lmRepetitionPenalty = modelOverrides.lmRepetitionPenalty;
+      }
+      if (modelOverrides.noRepeatNgramSize !== undefined) {
+        finalParams.noRepeatNgramSize = modelOverrides.noRepeatNgramSize;
+      }
+      if (modelOverrides.apgEta !== undefined) {
+        finalParams.apgEta = modelOverrides.apgEta;
+      }
+      finalParams.styleDna = styleDna;
+    }
+
     // Section mode overrides
     if (finalParams.sectionMode) {
       finalParams.batchSize = 1;
@@ -346,7 +377,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
     }
 
     onGenerate(finalParams);
-  }, [isGenerating, activeJobCount, onGenerate, params]);
+  }, [isGenerating, activeJobCount, onGenerate, params, styleDna]);
 
   const handleRandomDescription = async () => {
     if (!token) return;
@@ -1249,6 +1280,15 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                 {t('create.recordVoice', 'Record Voice')}
               </button>
             </CollapsibleSection>
+
+            {/* Style DNA */}
+            <StyleDnaPanel
+              dna={styleDna}
+              onChange={setStyleDna}
+              isOpen={openSections.styleDna ?? false}
+              onToggle={() => toggleSection('styleDna')}
+              lyrics={params.lyrics}
+            />
 
             {/* LoRA */}
             <CollapsibleSection
