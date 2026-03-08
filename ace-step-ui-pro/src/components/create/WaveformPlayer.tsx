@@ -80,7 +80,7 @@ export default function WaveformPlayer({
       } else if (pct <= progress) {
         c.fillStyle = 'rgba(139,92,246,0.85)';
       } else {
-        c.fillStyle = 'rgba(148,163,184,0.28)';
+        c.fillStyle = document.documentElement.classList.contains('light') ? 'rgba(100,110,140,0.35)' : 'rgba(148,163,184,0.28)';
       }
       c.fillRect(x, (h - barH) / 2, barW - 1, barH);
     }

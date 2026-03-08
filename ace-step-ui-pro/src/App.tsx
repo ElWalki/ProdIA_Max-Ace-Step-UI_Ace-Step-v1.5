@@ -19,6 +19,8 @@ import GpuMonitorView from './components/views/GpuMonitorView';
 import StudioView from './components/views/StudioView';
 import FeaturesView from './components/views/FeaturesView';
 import SettingsModal from './components/ui/SettingsModal';
+import UserProfileModal from './components/ui/UserProfileModal';
+import { VideoGeneratorModal } from './components/create/VideoGeneratorModal';
 import Toast from './components/ui/Toast';
 import LoginScreen from './components/ui/LoginScreen';
 
@@ -56,8 +58,10 @@ export default function App() {
   const [metadataSong, setMetadataSong] = useState<Song | null>(null);
   const [detailSong, setDetailSong] = useState<Song | null>(null);
   const [stemSong, setStemSong] = useState<Song | null>(null);
+  const [videoSong, setVideoSong] = useState<Song | null>(null);
   const [reuseParams, setReuseParams] = useState<GenerationParams | null>(null);
   const [settingsOpen, setSettingsOpen] = useState(false);
+  const [profileOpen, setProfileOpen] = useState(false);
   const [assistantOpen, setAssistantOpen] = useState(false);
   const [panelWidth, setPanelWidth] = useState(420);
   const [isDraggingPanel, setIsDraggingPanel] = useState(false);
@@ -365,7 +369,7 @@ export default function App() {
         setStemSong(song);
         break;
       case 'createVideo':
-        showToast(t('common.videoComingSoon', 'Video creation coming soon'), 'info');
+        setVideoSong(song);
         break;
       case 'prepareTraining':
         setCurrentView('training');
@@ -477,6 +481,7 @@ export default function App() {
                 onSelectSong={setDetailSong}
                 onRenameSong={renameSong}
                 onLikeSong={toggleLike}
+                audioRef={audioRef}
               />
             </div>
             {detailSong && (
@@ -503,6 +508,7 @@ export default function App() {
               onSelectSong={setDetailSong}
               onRenameSong={renameSong}
               onLikeSong={toggleLike}
+              audioRef={audioRef}
             />
             {detailSong && (
               <SongDetailPanel
@@ -550,6 +556,7 @@ export default function App() {
         theme={theme}
         onToggleTheme={() => setTheme(prev => prev === 'dark' ? 'light' : 'dark')}
         onOpenSettings={() => setSettingsOpen(true)}
+        onOpenProfile={() => setProfileOpen(true)}
         assistantOpen={assistantOpen}
         onToggleAssistant={() => setAssistantOpen(v => !v)}
       />
@@ -576,9 +583,13 @@ export default function App() {
 
       <SettingsModal isOpen={settingsOpen} onClose={() => setSettingsOpen(false)} />
 
+      <UserProfileModal isOpen={profileOpen} onClose={() => setProfileOpen(false)} />
+
       <MetadataModal song={metadataSong} onClose={() => setMetadataSong(null)} />
 
       <StemSeparator song={stemSong} onClose={() => setStemSong(null)} />
+
+      <VideoGeneratorModal isOpen={!!videoSong} onClose={() => setVideoSong(null)} song={videoSong} />
 
       {toast && (
         <Toast

@@ -115,8 +115,10 @@ export default function GpuMonitorView() {
 
     ctx.clearRect(0, 0, w, h);
 
+    const isLight = document.documentElement.classList.contains('light');
+
     // Grid lines
-    ctx.strokeStyle = 'rgba(255,255,255,0.05)';
+    ctx.strokeStyle = isLight ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.05)';
     ctx.lineWidth = 1;
     for (let i = 0; i <= 4; i++) {
       const y = (h / 4) * i;
@@ -127,7 +129,7 @@ export default function GpuMonitorView() {
     }
 
     // Y-axis labels
-    ctx.fillStyle = 'rgba(255,255,255,0.3)';
+    ctx.fillStyle = isLight ? 'rgba(0,0,0,0.4)' : 'rgba(255,255,255,0.3)';
     ctx.font = '10px Inter, sans-serif';
     ctx.textAlign = 'left';
     for (let i = 0; i <= 4; i++) {
@@ -264,7 +266,7 @@ export default function GpuMonitorView() {
             </span>
             <div className="relative w-32 h-32">
               <svg viewBox="0 0 120 120" className="w-full h-full -rotate-90">
-                <circle cx="60" cy="60" r="54" fill="none" stroke="rgba(255,255,255,0.06)" strokeWidth="8" />
+                <circle cx="60" cy="60" r="54" fill="none" stroke={document.documentElement.classList.contains('light') ? 'rgba(0,0,0,0.08)' : 'rgba(255,255,255,0.06)'} strokeWidth="8" />
                 <circle
                   cx="60" cy="60" r="54" fill="none"
                   strokeWidth="8" strokeLinecap="round"

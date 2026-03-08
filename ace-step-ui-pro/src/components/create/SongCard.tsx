@@ -1,6 +1,6 @@
 import React, { useState, useCallback, useMemo, useRef, useEffect, memo } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Music, Play, Pause, Loader2, ThumbsUp, ThumbsDown, Share2, Video, ListPlus, MoreVertical, Disc3 } from 'lucide-react';
+import { Music, Play, Pause, Loader2, ThumbsUp, ThumbsDown, Share2, Video, ListPlus, MoreVertical, Disc3, Copy, Check } from 'lucide-react';
 import type { Song } from '../../types';
 import SongContextMenu from '../ui/SongContextMenu';
 import { getCoverStyle } from '../../utils/coverArt';
@@ -15,6 +15,8 @@ interface SongCardProps {
   onSelect?: () => void;
   onRename?: (newTitle: string) => void;
   onLike?: () => void;
+  audioRef?: React.RefObject<HTMLAudioElement>;
+  onCopySeed?: (seed: number) => void;
 }
 
 // Deterministic avatar color from string
@@ -25,11 +27,103 @@ function avatarColor(name: string) {
   return colors[h % colors.length];
 }
 
-export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDelete, onMenuAction, onSelect, onRename, onLike }: SongCardProps) {
+// Deterministic waveform bars from song ID
+function generateBars(id: string, count: number): number[] {
+  const bars: number[] = [];
+  let seed = 0;
+  for (let i = 0; i < id.length; i++) seed = (seed * 31 + id.charCodeAt(i)) >>> 0;
+  for (let i = 0; i < count; i++) {
+    seed = (seed * 1103515245 + 12345) >>> 0;
+    bars.push(0.15 + 0.85 * ((seed >> 16) & 0x7fff) / 0x7fff);
+  }
+  return bars;
+}
+
+/** Inline mini waveform – purple fill tracks playback progress */
+function MiniWaveform({ songId, isPlaying, isCurrent, audioRef }: {
+  songId: string; isPlaying: boolean; isCurrent: boolean;
+  audioRef?: React.RefObject<HTMLAudioElement>;
+}) {
+  const canvasRef = useRef<HTMLCanvasElement>(null);
+  const barsRef = useRef<number[]>(generateBars(songId, 60));
+  const rafRef = useRef<number>(0);
+
+  useEffect(() => {
+    const canvas = canvasRef.current;
+    if (!canvas) return;
+    const ctx = canvas.getContext('2d');
+    if (!ctx) return;
+
+    const draw = () => {
+      const w = canvas.offsetWidth;
+      const h = canvas.offsetHeight;
+      const dpr = window.devicePixelRatio || 1;
+      canvas.width = w * dpr;
+      canvas.height = h * dpr;
+      ctx.scale(dpr, dpr);
+      ctx.clearRect(0, 0, w, h);
+
+      const bars = barsRef.current;
+      const gap = 1.5;
+      const barW = (w - gap * (bars.length - 1)) / bars.length;
+      let progress = 0;
+      if (isCurrent && audioRef?.current) {
+        const a = audioRef.current;
+        if (a.duration && isFinite(a.duration)) progress = a.currentTime / a.duration;
+      }
+
+      bars.forEach((amp, i) => {
+        const x = i * (barW + gap);
+        const barH = Math.max(1, amp * h);
+        const y = (h - barH) / 2;
+        const barProgress = (i + 0.5) / bars.length;
+        if (isCurrent && barProgress <= progress) {
+          ctx.fillStyle = '#a855f7'; // purple for played portion
+        } else {
+          const isLight = document.documentElement.classList.contains('light');
+          ctx.fillStyle = isLight ? '#b3b8cc' : '#3f3f4d'; // surface-300
+        }
+        ctx.beginPath();
+        ctx.roundRect(x, y, Math.max(1, barW), barH, 0.5);
+        ctx.fill();
+      });
+
+      if (isCurrent && isPlaying) {
+        rafRef.current = requestAnimationFrame(draw);
+      }
+    };
+
+    draw();
+    if (isCurrent && isPlaying) {
+      rafRef.current = requestAnimationFrame(draw);
+    }
+
+    // Also listen to timeupdate for non-RAF updates
+    const audio = audioRef?.current;
+    const onTime = () => { if (!isPlaying) draw(); };
+    audio?.addEventListener('timeupdate', onTime);
+
+    return () => {
+      cancelAnimationFrame(rafRef.current);
+      audio?.removeEventListener('timeupdate', onTime);
+    };
+  }, [songId, isPlaying, isCurrent, audioRef]);
+
+  return (
+    <canvas
+      ref={canvasRef}
+      className="w-full h-5 rounded"
+      style={{ imageRendering: 'pixelated' }}
+    />
+  );
+}
+
+export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDelete, onMenuAction, onSelect, onRename, onLike, audioRef, onCopySeed }: SongCardProps) {
   const { t } = useTranslation();
   const [menu, setMenu] = useState<{ x: number; y: number } | null>(null);
   const [isEditing, setIsEditing] = useState(false);
   const [editTitle, setEditTitle] = useState('');
+  const [seedCopied, setSeedCopied] = useState(false);
   const titleInputRef = useRef<HTMLInputElement>(null);
 
   const handleContextMenu = useCallback((e: React.MouseEvent) => {
@@ -80,6 +174,16 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
     e.dataTransfer.setData('text/song-id', song.id);
     e.dataTransfer.effectAllowed = 'copy';
   }, [song]);
+
+  const handleSeedClick = useCallback((e: React.MouseEvent) => {
+    e.stopPropagation();
+    const s = song.generationParams?.seed;
+    if (s === undefined) return;
+    navigator.clipboard.writeText(String(s));
+    setSeedCopied(true);
+    onCopySeed?.(s);
+    setTimeout(() => setSeedCopied(false), 1500);
+  }, [song.generationParams?.seed, onCopySeed]);
 
   const creatorName = song.creator || song.userId || 'User';
   const creatorInitial = creatorName.charAt(0).toUpperCase();
@@ -160,7 +264,7 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
               </span>
             )}
             {ditLabel && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-violet-500/20 text-violet-300 font-semibold shrink-0 leading-none">
+              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-gradient-to-r from-violet-500/25 to-accent-500/25 text-violet-300 font-bold shrink-0 leading-none border border-violet-500/30 tracking-wide uppercase">
                 {ditLabel}
               </span>
             )}
@@ -170,9 +274,14 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
               </span>
             )}
             {seed !== undefined && (
-              <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-surface-300/20 text-surface-500 font-medium shrink-0 leading-none">
+              <button
+                onClick={handleSeedClick}
+                className="flex items-center gap-0.5 text-[9px] px-1.5 py-0.5 rounded-full bg-surface-300/20 text-surface-500 font-medium shrink-0 leading-none hover:bg-surface-300/40 hover:text-surface-700 transition-colors cursor-pointer"
+                title={t('create.copySeed', 'Click to copy seed')}
+              >
+                {seedCopied ? <Check className="w-2.5 h-2.5 text-green-400" /> : <Copy className="w-2.5 h-2.5" />}
                 seed: {seed}
-              </span>
+              </button>
             )}
             {inferMethod && (
               <span className="text-[9px] px-1.5 py-0.5 rounded-full bg-teal-500/15 text-teal-400 font-medium shrink-0 leading-none uppercase">
@@ -188,19 +297,36 @@ export default memo(function SongCard({ song, isPlaying, isCurrent, onPlay, onDe
 
           {/* Row 2: Creator */}
           <div className="flex items-center gap-1.5">
-            <span
-              className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0"
+            <button
+              onClick={(e) => { e.stopPropagation(); onMenuAction?.('openProfile'); }}
+              className="w-4 h-4 rounded-full flex items-center justify-center text-[8px] font-bold text-white shrink-0 hover:ring-2 hover:ring-accent-500/50 transition-all cursor-pointer"
               style={{ backgroundColor: avatarColor(creatorName) }}
             >
               {creatorInitial}
-            </span>
-            <span className="text-xs text-surface-500">{creatorName}</span>
+            </button>
+            <button
+              onClick={(e) => { e.stopPropagation(); onMenuAction?.('openProfile'); }}
+              className="text-xs text-surface-500 hover:text-accent-400 transition-colors cursor-pointer"
+            >
+              {creatorName}
+            </button>
           </div>
 
           {/* Row 3: Style tags */}
           {song.style && (
             <p className="text-xs text-surface-500 leading-snug line-clamp-1">{song.style}</p>
           )}
+
+          {/* Row 4: Waveform */}
+          {!song.isGenerating && song.audioUrl && (
+            <MiniWaveform
+              songId={song.id}
+              isPlaying={isPlaying}
+              isCurrent={isCurrent}
+              audioRef={audioRef}
+            />
+          )}
+
           {song.isGenerating && (
             <p className="text-xs text-accent-400">
               {song.stage || t('create.generatingSong', 'Generating...')}

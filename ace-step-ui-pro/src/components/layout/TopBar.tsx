@@ -10,6 +10,7 @@ interface TopBarProps {
   theme: 'dark' | 'light';
   onToggleTheme: () => void;
   onOpenSettings?: () => void;
+  onOpenProfile?: () => void;
   assistantOpen?: boolean;
   onToggleAssistant?: () => void;
 }
@@ -24,7 +25,7 @@ const NAV_ITEMS: { view: View; key: string }[] = [
   { view: 'features', key: 'nav.features' },
 ];
 
-export default function TopBar({ currentView, onNavigate, theme, onToggleTheme, onOpenSettings, assistantOpen, onToggleAssistant }: TopBarProps) {
+export default function TopBar({ currentView, onNavigate, theme, onToggleTheme, onOpenSettings, onOpenProfile, assistantOpen, onToggleAssistant }: TopBarProps) {
   const { t, i18n } = useTranslation();
   const { user, logout } = useAuth();
   const [langOpen, setLangOpen] = useState(false);
@@ -133,10 +134,23 @@ export default function TopBar({ currentView, onNavigate, theme, onToggleTheme, 
 
         {user && (
           <div className="flex items-center gap-2 ml-2">
-            <div className="w-7 h-7 rounded-full bg-accent-500/15 flex items-center justify-center">
-              <User className="w-3.5 h-3.5 text-accent-400" />
-            </div>
-            <span className="text-xs text-surface-500 hidden md:block">{user.username}</span>
+            <button
+              onClick={onOpenProfile}
+              className="w-7 h-7 rounded-full bg-accent-500/15 flex items-center justify-center hover:ring-2 hover:ring-accent-500/40 transition-all"
+              title={t('profile.title', 'Profile')}
+            >
+              {user.avatar_url ? (
+                <img src={user.avatar_url} alt="" className="w-7 h-7 rounded-full object-cover" />
+              ) : (
+                <User className="w-3.5 h-3.5 text-accent-400" />
+              )}
+            </button>
+            <button
+              onClick={onOpenProfile}
+              className="text-xs text-surface-500 hover:text-accent-400 transition-colors hidden md:block cursor-pointer"
+            >
+              {user.username}
+            </button>
             <button onClick={logout} className="p-1.5 rounded-lg text-surface-400 hover:text-red-400 hover:bg-red-400/10 transition-colors" title="Logout">
               <LogOut className="w-3.5 h-3.5" />
             </button>

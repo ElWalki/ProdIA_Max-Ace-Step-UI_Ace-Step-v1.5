@@ -22,9 +22,10 @@ interface LibraryViewProps {
   onSelectSong?: (song: Song) => void;
   onRenameSong?: (id: string, newTitle: string) => void;
   onLikeSong?: (id: string) => void;
+  audioRef?: React.RefObject<HTMLAudioElement>;
 }
 
-export default function LibraryView({ songs, currentSong, isPlaying, onPlaySong, onDeleteSong, onMenuAction, onSelectSong, onRenameSong, onLikeSong }: LibraryViewProps) {
+export default function LibraryView({ songs, currentSong, isPlaying, onPlaySong, onDeleteSong, onMenuAction, onSelectSong, onRenameSong, onLikeSong, audioRef }: LibraryViewProps) {
   const { t } = useTranslation();
   const [search, setSearch] = useState('');
   const [filterKey, setFilterKey] = useState<FilterKey>('all');
@@ -190,6 +191,7 @@ export default function LibraryView({ songs, currentSong, isPlaying, onPlaySong,
               onSelect={onSelectSong ? () => onSelectSong(song) : undefined}
               onRename={onRenameSong ? (newTitle: string) => onRenameSong(song.id, newTitle) : undefined}
               onLike={onLikeSong ? () => onLikeSong(song.id) : undefined}
+              audioRef={audioRef}
             />
           ))}
         </div>

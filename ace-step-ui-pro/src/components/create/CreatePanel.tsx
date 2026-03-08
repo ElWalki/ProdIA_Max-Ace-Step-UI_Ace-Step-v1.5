@@ -97,6 +97,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
   const [showModelMenu, setShowModelMenu] = useState(false);
   const [modelLoading, setModelLoading] = useState(false);
   const [downloadingModels, setDownloadingModels] = useState<Record<string, { progress: string; status: string }>>({});
+  const [pendingDownload, setPendingDownload] = useState<string | null>(null);
   const downloadPollRef = useRef<Record<string, ReturnType<typeof setInterval>>>({});
   const modelMenuRef = useRef<HTMLDivElement>(null);
   const templateMenuRef = useRef<HTMLDivElement>(null);
@@ -712,7 +713,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                         )}
                         {!m.is_preloaded && !dl && (
                           <button
-                            onClick={(e) => handleDownloadModel(m.name, e)}
+                            onClick={(e) => { e.stopPropagation(); setPendingDownload(m.name); }}
                             className="flex items-center gap-1 text-[9px] text-accent-400 bg-accent-500/10 hover:bg-accent-500/20 px-1.5 py-0.5 rounded font-medium transition-colors"
                             title={t('create.downloadModel', 'Download model')}
                           >
@@ -747,9 +748,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                 {availableModels.some(m => !m.is_preloaded && !downloadingModels[m.name]) && (
                   <div className="px-3 py-2 border-t border-surface-300/40">
                     <button
-                      onClick={(e) => {
-                        availableModels.filter(m => !m.is_preloaded && !downloadingModels[m.name]).forEach(m => handleDownloadModel(m.name, e));
-                      }}
+                      onClick={() => setPendingDownload('__all__')}
                       className="w-full flex items-center justify-center gap-1.5 text-[10px] text-accent-400 hover:text-accent-300 font-semibold transition-colors"
                     >
                       <Download className="w-3 h-3" />
@@ -760,6 +759,51 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
               </div>
             )}
           </div>
+
+          {/* Download Confirmation Dialog */}
+          {pendingDownload && (
+            <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-[60] flex items-center justify-center" onClick={() => setPendingDownload(null)}>
+              <div className="bg-surface-100 border border-surface-300 rounded-2xl shadow-2xl w-80 p-5 animate-scale-in" onClick={e => e.stopPropagation()}>
+                <div className="flex items-center gap-3 mb-3">
+                  <div className="w-10 h-10 rounded-xl bg-accent-500/15 flex items-center justify-center">
+                    <Download className="w-5 h-5 text-accent-400" />
+                  </div>
+                  <div>
+                    <h3 className="text-sm font-bold text-surface-900">{t('create.confirmDownload', 'Download Model')}</h3>
+                    <p className="text-[10px] text-surface-500">{t('create.fromHuggingFace', 'From HuggingFace')}</p>
+                  </div>
+                </div>
+                <p className="text-xs text-surface-700 mb-1">
+                  {pendingDownload === '__all__'
+                    ? t('create.downloadAllConfirm', 'Download all missing models? This will use significant disk space and bandwidth.')
+                    : t('create.downloadConfirm', 'Download {{model}}? Model files are typically 1-3 GB.', { model: MODEL_LABELS[pendingDownload]?.label || pendingDownload.replace('acestep-v15-', '') })
+                  }
+                </p>
+                <p className="text-[10px] text-surface-400 mb-4">{t('create.downloadNote', 'The download will run in the background. You can continue working.')}</p>
+                <div className="flex gap-2">
+                  <button
+                    onClick={() => setPendingDownload(null)}
+                    className="flex-1 px-3 py-1.5 rounded-lg text-xs font-medium text-surface-700 bg-surface-200 hover:bg-surface-300 transition-colors"
+                  >
+                    {t('common.cancel', 'Cancel')}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      if (pendingDownload === '__all__') {
+                        availableModels.filter(m => !m.is_preloaded && !downloadingModels[m.name]).forEach(m => handleDownloadModel(m.name, e));
+                      } else {
+                        handleDownloadModel(pendingDownload, e);
+                      }
+                      setPendingDownload(null);
+                    }}
+                    className="flex-1 px-3 py-1.5 rounded-lg text-xs font-bold text-white bg-accent-500 hover:bg-accent-600 transition-colors"
+                  >
+                    {t('create.download', 'Download')}
+                  </button>
+                </div>
+              </div>
+            </div>
+          )}
           <div className="flex-1" />
           {/* Template save/load */}
           <div className="relative" ref={templateMenuRef}>
@@ -1015,7 +1059,7 @@ export default memo(function CreatePanel({ onGenerate, isGenerating, activeJobCo
                   rows={6}
                   ref={lyricsRef}
                   disabled={params.instrumental}
-                  style={coloredLyrics && params.lyrics && !params.instrumental ? { lineHeight: '1.5', color: 'transparent', caretColor: '#e0e0ee' } : { lineHeight: '1.5' }}
+                  style={coloredLyrics && params.lyrics && !params.instrumental ? { lineHeight: '1.5', color: 'transparent', caretColor: 'var(--color-surface-900)' } : { lineHeight: '1.5' }}
                   className={`relative w-full bg-surface-100 border border-surface-300 rounded-md px-2 py-1.5 text-surface-900 placeholder:text-surface-400 min-h-[100px] max-h-[500px] font-mono text-xs no-scrollbar ${
                     params.instrumental ? 'opacity-40 cursor-not-allowed' : ''
                   }`}

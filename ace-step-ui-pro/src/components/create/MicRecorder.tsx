@@ -61,7 +61,7 @@ export default function MicRecorder({ isOpen, onClose, onAccept, targetSection =
     const draw = () => {
       animFrameRef.current = requestAnimationFrame(draw);
       analyser.getByteTimeDomainData(dataArray);
-      ctx.fillStyle = 'rgba(10,10,12,0.3)';
+      ctx.fillStyle = document.documentElement.classList.contains('light') ? 'rgba(248,249,252,0.3)' : 'rgba(11,11,16,0.3)';
       ctx.fillRect(0, 0, canvas.width, canvas.height);
       ctx.lineWidth = 2;
       ctx.strokeStyle = '#6366f1';

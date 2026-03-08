@@ -43,7 +43,7 @@ export default function SliderField({ label, value, onChange, min, max, step = 1
               onMouseLeave={() => setShowTip(false)}
             />
             {showTip && (
-              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-[#1a1a2e] border border-surface-300/40 text-[10px] text-surface-300 leading-snug whitespace-nowrap z-50 shadow-lg">
+              <span className="absolute bottom-full left-1/2 -translate-x-1/2 mb-1.5 px-2.5 py-1.5 rounded-lg bg-surface-100 border border-surface-300/40 text-[10px] text-surface-800 leading-snug whitespace-nowrap z-50 shadow-lg">
                 {tooltip}
               </span>
             )}
