@@ -33,7 +33,6 @@
 | **ACE-Step UI** (base UI) | [fspecii](https://github.com/fspecii) | MIT | [github.com/fspecii/ace-step-ui](https://github.com/fspecii/ace-step-ui) |
 | **ACE-Step 1.5** (AI model) | [ACE-Step Team](https://github.com/ace-step) | MIT | [github.com/ace-step/ACE-Step-1.5](https://github.com/ace-step/ACE-Step-1.5) |
 | **ProdIA-MAX** (this fork) | [ElWalki](https://github.com/ElWalki) | MIT | — |
-| **Side-Step** (LoRA trainer) | [koda-dernet](https://github.com/koda-dernet) | MIT | [github.com/koda-dernet/Side-Step](https://github.com/koda-dernet/Side-Step) |
 | **i18n system & translations** | [scruffynerf](https://github.com/scruffynerf) | MIT | [PR #1](https://github.com/ElWalki/ProdIA_Max-Ace-Step-UI_Ace-Step-v1.5/pull/1) |
 
 ---
@@ -81,7 +80,6 @@
 | **LoRA Quick Unload** | ✅ | One-click unload on collapsed LoRA panel |
 | **Time Signature Labels** | ✅ | Proper 1/4, 2/4, 3/4, 4/4, 5/4, 6/8, 7/8, 8/8 notation |
 | **Prepare for Training** | ✅ Beta | Quick button to prep songs for LoRA training |
-| **Side-Step Trainer** | ✅ Integrated | LoRA/LoKR/DoRA/LoHA/OFT fine-tuning — GUI, Wizard & CLI (by koda-dernet) |
 | **VRAM Safety** | ✅ | Generation locked during Demucs separation |
 | **BPM & Key Detection** | ✅ | `detectar_bpm_clave.py` — batch detect BPM/key |
 | **Lyric Transcription** | ✅ | `transcribir_letras.py` — Whisper-based transcription |
@@ -117,7 +115,7 @@
 | Node.js | 18 | 20 |
 | CUDA | — | 12.8 |
 
-> **Python dependencies** are unified in the top-level [`requirements.txt`](requirements.txt) which includes ACE-Step core deps (via `-r ACE-Step-1.5_/requirements.txt`) plus Side-Step trainer and ProdIA production tool packages.  
+> **Python dependencies** are defined in [`ACE-Step-1.5_/requirements.txt`](ACE-Step-1.5_/requirements.txt) (PyTorch, Transformers, Gradio, etc.).  
 > **Node.js dependencies** are managed via `package.json` in [`ace-step-ui/`](ace-step-ui/) (Express backend) and [`ace-step-ui-pro/`](ace-step-ui-pro/) (React frontend).  
 > All dependencies are installed automatically by `iniciar_todo.bat` (Windows) or `iniciar_todo.sh` (Linux/macOS) on first run.
 
@@ -155,14 +153,6 @@ ProdIA-MAX/
 │   ├── server/                 #   Express + SQLite backend (Node.js)
 │   ├── package.json            #   Node.js dependencies (backend + frontend)
 │   └── ...
-│
-├── Side-Step/                  # LoRA/LoKR fine-tuning trainer (by koda-dernet)
-│   ├── train.py                #   Training entry point
-│   ├── sidestep_tui.py         #   Interactive wizard (TUI)
-│   ├── sidestep_engine/        #   Core training engine
-│   ├── frontend/               #   Electron GUI app
-│   ├── scripts/                #   Helper scripts
-│   └── requirements.txt        #   Side-Step-specific deps
 │
 ├── ace-step-ui-pro/            # ProdIA-MAX Pro UI (React 19 + Vite + Tailwind v4)
 │   ├── src/                    #   TypeScript source code
@@ -214,8 +204,6 @@ ProdIA-MAX/
 ├── desinstalar.sh              # Uninstall / cleanup
 ├── detectar_bpm_clave.sh       # BPM & key detection
 ├── transcribir_letras.sh       # Transcribe lyrics
-│
-├── requirements.txt            # ★ Unified Python deps (ACE-Step + Side-Step + tools)
 │
 │── ★ Documentation ─────────────────────────────────────
 ├── README.md                   # This file
@@ -275,7 +263,6 @@ See [ACE-Step-1.5_/LICENSE](ACE-Step-1.5_/LICENSE) for the full license text.
 
 <p align="center">
   Built on top of the amazing work of <a href="https://github.com/fspecii/ace-step-ui">fspecii</a> and the <a href="https://github.com/ace-step/ACE-Step-1.5">ACE-Step team</a>.<br>
-  Side-Step LoRA trainer by <a href="https://github.com/koda-dernet">koda-dernet</a>.<br>
   i18n system & translations contributed by <a href="https://github.com/scruffynerf">scruffynerf</a>.<br>
   <em>Stop paying subscriptions. Start creating with ACE-Step.</em>
 </p>

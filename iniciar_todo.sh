@@ -10,7 +10,6 @@ cd "$SCRIPT_DIR"
 
 ACESTEP_DIR="$SCRIPT_DIR/ACE-Step-1.5_"
 UI_DIR="$SCRIPT_DIR/ace-step-ui"
-SIDESTEP_DIR="$SCRIPT_DIR/Side-Step"
 VENV="$ACESTEP_DIR/.venv"
 
 echo ""
@@ -67,11 +66,8 @@ fi
 
 # ─── Instalar dependencias Python si es necesario ──────────────
 PY_MARKER="$ACESTEP_DIR/.deps_installed"
-TOP_REQS="$SCRIPT_DIR/requirements.txt"
 NEED_PY_INSTALL=0
 if [ ! -f "$PY_MARKER" ]; then
-    NEED_PY_INSTALL=1
-elif [ -f "$TOP_REQS" ] && [ "$TOP_REQS" -nt "$PY_MARKER" ]; then
     NEED_PY_INSTALL=1
 elif [ -f "$ACESTEP_DIR/requirements.txt" ] && [ "$ACESTEP_DIR/requirements.txt" -nt "$PY_MARKER" ]; then
     NEED_PY_INSTALL=1
@@ -79,12 +75,11 @@ fi
 if [ "$NEED_PY_INSTALL" -eq 1 ]; then
     echo ""
     echo "  [Setup] Instalando dependencias Python / Installing Python dependencies..."
-    echo "          ACE-Step + Side-Step + ProdIA tools"
     echo "          Esto puede tardar varios minutos / This may take several minutes..."
     echo ""
     "$PYTHON" -m pip install --upgrade pip 2>/dev/null || true
-    if [ -f "$TOP_REQS" ]; then
-        if "$PYTHON" -m pip install -r "$TOP_REQS"; then
+    if [ -f "$ACESTEP_DIR/requirements.txt" ]; then
+        if "$PYTHON" -m pip install -r "$ACESTEP_DIR/requirements.txt"; then
             touch "$PY_MARKER"
             echo "  [OK] Dependencias Python instaladas / Python deps installed."
         else

@@ -13,7 +13,6 @@ echo.
 
 REM ─── Rutas / Paths ──────────────────────────────────────────
 set "ACESTEP_DIR=%~dp0ACE-Step-1.5_"
-set "SIDESTEP_DIR=%~dp0Side-Step"
 set "UI_DIR=%~dp0ace-step-ui"
 set "PRO_UI_DIR=%~dp0ace-step-ui-pro"
 set "VENV=%ACESTEP_DIR%\.venv"
@@ -83,22 +82,20 @@ REM ─── Instalar dependencias Python si es necesario ───────
 REM     Solo instala si no existe el marker o si requirements.txt cambio
 REM     Install Python deps only if marker missing or requirements.txt changed
 set "PY_MARKER=%ACESTEP_DIR%\.deps_installed"
-set "TOP_REQS=%~dp0requirements.txt"
 set "NEED_PY_INSTALL=0"
 if not exist "%PY_MARKER%" set "NEED_PY_INSTALL=1"
 if "%NEED_PY_INSTALL%"=="0" (
-    REM Comprobar si requirements.txt (top-level o ACE-Step) es mas nuevo que el marker
-    for /f "tokens=*" %%a in ('powershell -NoProfile -Command "$m=(Get-Item \"%PY_MARKER%\" -EA SilentlyContinue).LastWriteTime; $r1=(Get-Item \"%TOP_REQS%\" -EA SilentlyContinue).LastWriteTime; $r2=(Get-Item \"%ACESTEP_DIR%\requirements.txt\" -EA SilentlyContinue).LastWriteTime; if($r1 -gt $m -or $r2 -gt $m){echo 1}else{echo 0}"') do set "NEED_PY_INSTALL=%%a"
+    REM Comprobar si requirements.txt es mas nuevo que el marker
+    for /f "tokens=*" %%a in ('powershell -NoProfile -Command "if ((Get-Item \"%ACESTEP_DIR%\requirements.txt\" -ErrorAction SilentlyContinue).LastWriteTime -gt (Get-Item \"%PY_MARKER%\" -ErrorAction SilentlyContinue).LastWriteTime) { echo 1 } else { echo 0 }"') do set "NEED_PY_INSTALL=%%a"
 )
 if "%NEED_PY_INSTALL%"=="1" (
     echo.
     echo  [Setup] Instalando dependencias Python / Installing Python dependencies...
-    echo          ACE-Step + Side-Step + ProdIA tools
     echo          Esto puede tardar varios minutos / This may take several minutes...
     echo.
     "%PYTHON%" -m pip install --upgrade pip >nul 2>&1
-    if exist "%TOP_REQS%" (
-        "%PYTHON%" -m pip install -r "%TOP_REQS%"
+    if exist "%ACESTEP_DIR%\requirements.txt" (
+        "%PYTHON%" -m pip install -r "%ACESTEP_DIR%\requirements.txt"
         if %errorlevel% neq 0 (
             echo.
             echo  [AVISO / WARNING] Algunos paquetes pueden haber fallado.
