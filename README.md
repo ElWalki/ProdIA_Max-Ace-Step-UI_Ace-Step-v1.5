@@ -111,31 +111,133 @@
 |-------------|---------|-------------|
 | OS | Windows 10 / Linux / macOS | Windows 11 |
 | GPU VRAM | 4 GB | 12 GB+ |
-| Python | 3.10 | 3.11 |
-| Node.js | 18 | 20 |
+| Python | 3.10 | **3.11** |
+| Node.js | 18 | 20+ |
 | CUDA | — | 12.8 |
+| Disk Space | ~15 GB (required models) | ~40 GB (all models) |
 
-> **Python dependencies** are defined in [`ACE-Step-1.5_/requirements.txt`](ACE-Step-1.5_/requirements.txt) (PyTorch, Transformers, Gradio, etc.).  
-> **Node.js dependencies** are managed via `package.json` in [`ace-step-ui/`](ace-step-ui/) (Express backend) and [`ace-step-ui-pro/`](ace-step-ui-pro/) (React frontend).  
-> All dependencies are installed automatically by `iniciar_todo.bat` (Windows) or `iniciar_todo.sh` (Linux/macOS) on first run.
+---
+
+## 🔧 Installation / Instalación
+
+### What you MUST install manually / Lo que DEBES instalar manualmente
+
+You only need **3 things** installed before running ProdIA-MAX. Everything else is automatic.  
+Solo necesitas **3 cosas** instaladas antes de ejecutar ProdIA-MAX. Todo lo demás es automático.
+
+#### 1. Python 3.11
+
+**EN:** Download from [python.org](https://www.python.org/downloads/). During installation, check **"Add Python to PATH"** — this is critical.  
+**ES:** Descarga desde [python.org](https://www.python.org/downloads/). Durante la instalación, marca **"Add Python to PATH"** — esto es esencial.
+
+> ⚠️ Python **3.11** is strongly recommended. The `pyproject.toml` locks to `==3.11.*` and some dependencies (like `flash-attn`) only have pre-built wheels for 3.11.
+
+#### 2. Node.js 18+
+
+**EN:** Download from [nodejs.org](https://nodejs.org/) (LTS recommended). This powers the backend server and both frontends.  
+**ES:** Descarga desde [nodejs.org](https://nodejs.org/) (recomendado LTS). Esto ejecuta el servidor backend y ambas interfaces.
+
+#### 3. NVIDIA GPU + CUDA Drivers
+
+**EN:** You need an NVIDIA GPU with updated drivers. CUDA 12.8 compatible drivers are required — PyTorch will be installed with CUDA 12.8 support automatically. Without an NVIDIA GPU, the app **cannot generate music**.  
+**ES:** Necesitas una GPU NVIDIA con drivers actualizados. Se requieren drivers compatibles con CUDA 12.8 — PyTorch se instalará con soporte CUDA 12.8 automáticamente. Sin GPU NVIDIA, la app **no puede generar música**.
+
+> 💡 **Git** is only needed if you clone the repo. If you download the ZIP, Git is not required.  
+> 💡 **Git** solo es necesario si clonas el repo. Si descargas el ZIP, no necesitas Git.
+
+### Verify installation / Verificar instalación
+
+```bat
+python --version    REM Should show 3.11.x
+node --version       REM Should show v18+ or v20+
+nvidia-smi           REM Should show your GPU and driver version
+```
 
 ---
 
 ## ⚡ Quick Start / Inicio rápido
 
-**Windows:**
+### Windows
+
 ```bat
-REM Launch everything (installs deps on first run)
+REM Option 1: Launch everything (Classic UI + Pro UI + AI engine)
 iniciar_todo.bat
+
+REM Option 2: Launch Pro UI only (recommended)
+iniciar_pro.bat
 ```
 
-**Linux / macOS:**
+### Linux / macOS
+
 ```bash
-chmod +x iniciar_todo.sh setup.sh
+chmod +x iniciar_todo.sh
 ./iniciar_todo.sh
 ```
 
-Open / Abre: **http://localhost:3000**
+### What opens / Qué se abre
+
+| Launcher | URL | Description |
+|----------|-----|-------------|
+| `iniciar_todo.bat` | http://localhost:3000 | Classic UI (+ Pro UI on :3002) |
+| `iniciar_pro.bat` | http://localhost:3002 | Pro UI only (recommended) |
+
+---
+
+## 🚀 First Run — What Happens Automatically / Primera ejecución — Qué pasa automáticamente
+
+**EN:** The first time you run `iniciar_todo.bat` or `iniciar_pro.bat`, the script will automatically:
+
+**ES:** La primera vez que ejecutes `iniciar_todo.bat` o `iniciar_pro.bat`, el script automáticamente:
+
+| Step | What it does | Time (est.) |
+|------|-------------|-------------|
+| 1️⃣ | **Creates Python virtual environment** (`.venv` inside `ACE-Step-1.5_/`) | ~10 sec |
+| 2️⃣ | **Installs Python dependencies** via `pip install -r requirements.txt` — PyTorch (CUDA 12.8), Transformers, Gradio, etc. | ~5-15 min |
+| 3️⃣ | **Installs Node.js dependencies** via `npm install` in 3 folders (ace-step-ui, ace-step-ui/server, ace-step-ui-pro) | ~2-5 min |
+| 4️⃣ | **Downloads AI models** from HuggingFace (~9.6 GB for required models) | ~10-30 min |
+| 5️⃣ | **Starts all services** and opens your browser | ~30 sec |
+
+> ⏱️ **Total first run time: ~20-50 minutes** depending on your internet speed. Subsequent runs start in ~30 seconds.  
+> ⏱️ **Tiempo total primera ejecución: ~20-50 minutos** dependiendo de tu velocidad de internet. Las siguientes ejecuciones arrancan en ~30 segundos.
+
+A marker file `.deps_installed` is created after successful installation — subsequent runs skip the install step unless `requirements.txt` changes.
+
+---
+
+## 🧠 AI Models / Modelos de IA
+
+All models are downloaded from **HuggingFace** automatically on first run. They are stored in `ACE-Step-1.5_/checkpoints/`.
+
+### Required models (auto-downloaded) / Modelos requeridos (descarga automática)
+
+| Model | Size | VRAM | Purpose / Propósito |
+|-------|------|------|---------------------|
+| `acestep-v15-turbo` | ~4.5 GB | ~4 GB | Default generation model (diffusion transformer) |
+| `vae` | ~500 MB | ~1 GB | Audio encoder/decoder |
+| `Qwen3-Embedding-0.6B` | ~1.2 GB | ~1 GB | Text encoder for lyrics/tags |
+| `acestep-5Hz-lm-1.7B` | ~3.4 GB | ~4 GB | Language model for music structure |
+| **Total** | **~9.6 GB** | | |
+
+### Optional models (manual download) / Modelos opcionales (descarga manual)
+
+Use `verificar_modelos.bat` to check which models you have and download extras:  
+Usa `verificar_modelos.bat` para ver qué modelos tienes y descargar extras:
+
+| Model | Size | VRAM | Purpose / Propósito |
+|-------|------|------|---------------------|
+| `acestep-v15-base` | ~4.5 GB | ~4 GB | Base model — 124 steps, highest quality ⭐ |
+| `acestep-v15-sft` | ~4.5 GB | ~4 GB | Fine-tuned variant |
+| `acestep-v15-turbo-shift1` | ~4.5 GB | ~4 GB | Turbo variant 1 |
+| `acestep-v15-turbo-shift3` | ~4.5 GB | ~4 GB | Turbo variant 3 |
+| `acestep-v15-turbo-continuous` | ~4.5 GB | ~4 GB | Continuous generation mode |
+| `acestep-5Hz-lm-0.6B` | ~1.2 GB | ~3 GB | Small LM (less VRAM) |
+| `acestep-5Hz-lm-4B` | ~7.8 GB | ~12 GB | Large LM (best quality lyrics) |
+
+> 💡 **VRAM recommendation:** 8 GB VRAM for turbo mode, 12 GB+ for base model at 124 steps with the 4B language model.  
+> 💡 **Recomendación VRAM:** 8 GB VRAM para modo turbo, 12 GB+ para modelo base a 124 pasos con el modelo de lenguaje 4B.
+
+All models come from HuggingFace repos under `ACE-Step/` — no account or token needed.  
+Todos los modelos vienen de repos HuggingFace bajo `ACE-Step/` — no se necesita cuenta ni token.
 
 ---
 
@@ -248,7 +350,108 @@ ACE-Step uses **semantic audio codes** — tokens at 5Hz that encode melody, rhy
 
 ---
 
-## 📄 License / Licencia
+## �️ Scripts Reference / Referencia de Scripts
+
+### Main Launchers / Lanzadores principales
+
+| Script | What it does / Qué hace |
+|--------|-------------------------|
+| `iniciar_todo.bat` | **Full launch**: installs deps if needed → starts AI engine (port 8001) → backend (port 3001) → Classic UI (port 3000) → Pro UI (port 3002) → opens browser |
+| `iniciar_pro.bat` | **Pro launch**: same as above but skips Classic UI — only AI engine + backend + Pro UI |
+| `iniciar_todo.sh` | **Linux/macOS** equivalent of `iniciar_todo.bat` |
+
+### Utility Scripts / Scripts de utilidad
+
+| Script | What it does / Qué hace |
+|--------|-------------------------|
+| `verificar_modelos.bat` | Checks which AI models are installed and offers to download missing ones from HuggingFace |
+| `transcribir_letras.bat` | Launches the lyrics transcription tool (uses Demucs for stem separation + Whisper for transcription). 6 quality modes available |
+| `limpiar_datos_usuario.bat` | Deletes user data only (database + generated audio). Keeps models, code, and dependencies |
+| `desinstalar.bat` | Full uninstall — removes `.venv`, all `node_modules`, database, and generated audio. Keeps models and source code |
+
+### Internal Scripts (ACE-Step-1.5_/) / Scripts internos
+
+| Script | What it does / Qué hace |
+|--------|-------------------------|
+| `_start_gradio_api.bat` | Starts only the Gradio AI engine on port 8001 |
+| `_start_backend.bat` | Starts only the Node.js backend on port 3001 |
+| `_start_frontend.bat` | Starts only the Classic UI on port 3000 |
+| `iniciar_acestep.bat` | Interactive menu: standalone Gradio UI (port 7860), API mode, model download, advanced config |
+
+### Production Tools / Herramientas de producción
+
+| Script | What it does / Qué hace |
+|--------|-------------------------|
+| `detectar_bpm_clave.py` | Batch detect BPM and musical key of audio files |
+| `transcribir_letras.py` | Transcribe lyrics from audio using Whisper |
+| `aplicar_captions_v3.py` | Apply training captions to audio files for LoRA preparation |
+| `truncar_captions.py` | Truncate captions to fit training requirements |
+| `check_genres.py` | Validate genre tags in audio files |
+| `check_tensors.py` | Inspect model tensor files |
+
+---
+
+## 🔌 Ports / Puertos
+
+| Port | Service | Description |
+|------|---------|-------------|
+| **8001** | Gradio API | ACE-Step AI music generation engine |
+| **3001** | Express.js Backend | Auth, model management, audio serving, database |
+| **3000** | Classic Frontend | Legacy React UI (Vite dev server) |
+| **3002** | Pro Frontend | ProdIA-MAX Pro UI (Vite + React 19 + Tailwind v4) |
+| **7860** | Gradio Native UI | Only used with `iniciar_acestep.bat` standalone mode |
+
+> All ports are killed automatically before launch to avoid conflicts. The scripts handle this for you.  
+> Todos los puertos se liberan automáticamente antes del lanzamiento para evitar conflictos.
+
+---
+
+## ❓ Troubleshooting / Solución de problemas
+
+### "Python not found" / "No se encuentra Python"
+- Make sure Python 3.11 is installed and **added to PATH**
+- Run `python --version` in a terminal to verify
+- If you have multiple Python versions, ensure 3.11 is the default
+
+### "Node.js not found" / "No se encuentra Node.js"
+- Install Node.js from [nodejs.org](https://nodejs.org/)
+- Restart your terminal after installing
+- Run `node --version` to verify
+
+### "CUDA out of memory" / "Sin memoria CUDA"
+- Use a smaller language model (`0.6B` instead of `1.7B` or `4B`)
+- Use turbo mode instead of base model
+- Close other GPU-intensive applications
+- Check your VRAM with `nvidia-smi`
+
+### Models not downloading / Los modelos no se descargan
+- Check your internet connection
+- Run `verificar_modelos.bat` to manually download models
+- Models are downloaded from HuggingFace — no VPN restrictions needed
+- If download was interrupted, delete the incomplete folder in `ACE-Step-1.5_/checkpoints/` and retry
+
+### Port already in use / Puerto en uso
+- The launcher scripts auto-kill processes on required ports
+- If you still get errors, manually close any process using ports 8001, 3001, 3000, or 3002
+- On Windows: `netstat -ano | findstr :PORT_NUMBER` then `taskkill /PID <PID> /F`
+
+### Audio doesn't generate / No se genera audio
+- Ensure the Gradio API started successfully (check the terminal window titled "Gradio API")
+- Wait for the message "Running on local URL: http://127.0.0.1:8001" before trying to generate
+- The first generation takes longer as PyTorch compiles kernels
+
+### Fresh start / Empezar de cero
+```bat
+REM Remove all installed dependencies (keeps models and code)
+desinstalar.bat
+
+REM Then relaunch — everything reinstalls automatically
+iniciar_todo.bat
+```
+
+---
+
+## �📄 License / Licencia
 
 This project is distributed under the **MIT License**.  
 Este proyecto se distribuye bajo la **Licencia MIT**.
