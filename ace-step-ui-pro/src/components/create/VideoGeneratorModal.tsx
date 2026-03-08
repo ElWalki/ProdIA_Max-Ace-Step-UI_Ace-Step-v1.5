@@ -867,7 +867,8 @@ export const VideoGeneratorModal: React.FC<VideoGeneratorModalProps> = ({ isOpen
       throw new Error('FFmpeg produced an empty output file');
     }
 
-    const blob = new Blob([outputData as Uint8Array], { type: 'video/mp4' });
+    const videoBytes = new Uint8Array(outputData as Uint8Array);
+    const blob = new Blob([videoBytes.buffer as ArrayBuffer], { type: 'video/mp4' });
     const url = URL.createObjectURL(blob);
     console.log('[Video] Created blob URL:', url, 'Size:', blob.size);
 
