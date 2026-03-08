@@ -98,7 +98,7 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
       const gap = 0.5;
       const barW = (w - gap * (bars.length - 1)) / bars.length;
       let progress = 0;
-      if (isCurrent && audioRef?.current) {
+      if (isCurrent && isPlaying && audioRef?.current) {
         const a = audioRef.current;
         if (a.duration && isFinite(a.duration)) progress = a.currentTime / a.duration;
       }
@@ -109,7 +109,7 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
         const barH = Math.max(1, amp * h * 0.95);
         const y = (h - barH) / 2;
         const barProgress = (i + 0.5) / bars.length;
-        if (isCurrent && barProgress <= progress) {
+        if (isCurrent && isPlaying && barProgress <= progress) {
           ctx.fillStyle = '#a855f7';
         } else {
           ctx.fillStyle = isLight ? '#b3b8cc' : '#3f3f4d';
@@ -128,7 +128,7 @@ function MiniWaveform({ songId, isPlaying, isCurrent, audioRef, audioUrl }: {
     }
 
     const audio = audioRef?.current;
-    const onTime = () => { if (!isPlaying) draw(); };
+    const onTime = () => { if (isCurrent && !isPlaying) draw(); };
     audio?.addEventListener('timeupdate', onTime);
 
     return () => {
