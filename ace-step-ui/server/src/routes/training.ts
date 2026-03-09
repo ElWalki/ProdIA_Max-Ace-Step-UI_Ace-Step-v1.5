@@ -5,10 +5,14 @@ import { config } from '../config/index.js';
 import { resolvePythonPath } from '../services/acestep.js';
 import multer from 'multer';
 import path from 'path';
+import { fileURLToPath } from 'url';
 import { existsSync, readdirSync, statSync, readFileSync } from 'fs';
 import { mkdir, writeFile, readFile } from 'fs/promises';
 import { execSync, spawn } from 'child_process';
 import { randomUUID } from 'crypto';
+
+const __filename = fileURLToPath(import.meta.url);
+const __dirname = path.dirname(__filename);
 
 const router = Router();
 
