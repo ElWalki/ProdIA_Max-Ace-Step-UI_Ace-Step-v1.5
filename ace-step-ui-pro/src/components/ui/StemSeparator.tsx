@@ -22,10 +22,15 @@ interface StemPlayerState {
 }
 
 const MODELS = [
-  { value: 'htdemucs_ft', label: 'HTDemucs Fine-Tuned (Best)' },
-  { value: 'htdemucs', label: 'HTDemucs' },
-  { value: 'htdemucs_6s', label: 'HTDemucs 6-Stem' },
-  { value: 'mdx_extra', label: 'MDX Extra' },
+  { value: 'htdemucs_ft', label: 'HTDemucs Fine-Tuned', desc: 'Mejor calidad · 4 stems', stems: 4 },
+  { value: 'htdemucs', label: 'HTDemucs', desc: 'Rápido · 4 stems', stems: 4 },
+  { value: 'htdemucs_6s', label: 'HTDemucs 6-Stem', desc: 'Guitarra + Piano separados · 6 stems', stems: 6 },
+];
+
+const QUALITIES = [
+  { value: 'rapida', label: 'Rápida', desc: 'Procesado ligero — más rápido' },
+  { value: 'alta', label: 'Alta', desc: 'Buen balance calidad/velocidad' },
+  { value: 'maxima', label: 'Máxima', desc: 'Menos residuos — más lento' },
 ];
 
 const STEM_ICONS_MAP: Record<string, React.FC<{ className?: string }>> = {
@@ -77,6 +82,7 @@ export default function StemSeparator({ song, onClose }: StemSeparatorProps) {
   const { t } = useTranslation();
   const { token } = useAuth();
   const [model, setModel] = useState('htdemucs_ft');
+  const [quality, setQuality] = useState('alta');
   const [processing, setProcessing] = useState(false);
   const [progress, setProgress] = useState(0);
   const [stems, setStems] = useState<StemResult[]>([]);
@@ -187,11 +193,12 @@ export default function StemSeparator({ song, onClose }: StemSeparatorProps) {
     }, 2000);
 
     try {
-      const stemCount = model === 'htdemucs_6s' ? 6 : (model === 'htdemucs_ft' || model === 'htdemucs' ? 4 : 2);
+      const modelInfo = MODELS.find(m => m.value === model);
+      const stemCount = modelInfo?.stems ?? 4;
       const res = await generateApi.separateStems({
         audioUrl: song.audioUrl,
         model,
-        quality: 'alta',
+        quality,
         stems: stemCount,
       }, token);
 
@@ -275,21 +282,44 @@ export default function StemSeparator({ song, onClose }: StemSeparatorProps) {
             </div>
           </div>
 
-          {/* Model selector — hide after separation */}
+          {/* Model & Quality selectors — hide after separation */}
           {stems.length === 0 && (
-            <div className="space-y-1.5">
-              <label className="text-xs font-medium text-surface-600">{t('stems.model', 'Separation Model')}</label>
-              <select
-                value={model}
-                onChange={e => setModel(e.target.value)}
-                disabled={processing}
-                className="w-full bg-surface-100 border border-surface-300 rounded-lg px-3 py-2 text-sm text-surface-900
-                  focus:outline-none focus:border-accent-500 transition-colors disabled:opacity-50"
-              >
-                {MODELS.map(m => (
-                  <option key={m.value} value={m.value}>{m.label}</option>
-                ))}
-              </select>
+            <div className="space-y-3">
+              {/* Model */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-surface-600">{t('stems.model', 'Separation Model')}</label>
+                <select
+                  value={model}
+                  onChange={e => setModel(e.target.value)}
+                  disabled={processing}
+                  className="w-full bg-surface-100 border border-surface-300 rounded-lg px-3 py-2 text-sm text-surface-900
+                    focus:outline-none focus:border-accent-500 transition-colors disabled:opacity-50"
+                >
+                  {MODELS.map(m => (
+                    <option key={m.value} value={m.value}>{m.label} — {m.desc}</option>
+                  ))}
+                </select>
+              </div>
+              {/* Quality */}
+              <div className="space-y-1.5">
+                <label className="text-xs font-medium text-surface-600">{t('stems.quality', 'Processing Quality')}</label>
+                <div className="grid grid-cols-3 gap-2">
+                  {QUALITIES.map(q => (
+                    <button
+                      key={q.value}
+                      onClick={() => setQuality(q.value)}
+                      disabled={processing}
+                      className={`flex flex-col items-center px-2 py-2 rounded-lg border text-xs transition-all disabled:opacity-50
+                        ${quality === q.value
+                          ? 'border-accent-500 bg-accent-500/10 text-accent-400 font-semibold'
+                          : 'border-surface-300 bg-surface-100 text-surface-500 hover:border-surface-400'}`}
+                    >
+                      <span>{q.label}</span>
+                      <span className="text-[10px] opacity-70 mt-0.5">{q.desc}</span>
+                    </button>
+                  ))}
+                </div>
+              </div>
             </div>
           )}
 

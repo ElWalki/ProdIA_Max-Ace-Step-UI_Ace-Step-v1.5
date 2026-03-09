@@ -22,6 +22,25 @@ warnings.filterwarnings("ignore")
 
 MODELO_DEMUCS = "htdemucs_ft"
 
+# Available Demucs models and their stem configurations
+DEMUCS_MODELS = {
+    "htdemucs_ft": {
+        "description": "HTDemucs Fine-Tuned — best quality 4-stem",
+        "stem_order": ["drums", "bass", "other", "vocals"],
+        "max_stems": 4,
+    },
+    "htdemucs": {
+        "description": "HTDemucs — fast 4-stem",
+        "stem_order": ["drums", "bass", "other", "vocals"],
+        "max_stems": 4,
+    },
+    "htdemucs_6s": {
+        "description": "HTDemucs 6-Stem — guitar & piano separation",
+        "stem_order": ["drums", "bass", "other", "vocals", "guitar", "piano"],
+        "max_stems": 6,
+    },
+}
+
 # Curated UVR model presets — model_name must match audio-separator's model registry
 UVR_MODELS = {
     "UVR-MDX-NET-Inst_HQ_3": {"description": "MDX-Net Inst HQ 3 — best overall vocal/inst", "stems": 2},
@@ -45,15 +64,16 @@ def get_device():
 # ---------------------------------------------------------------------------
 #  DEMUCS BACKEND
 # ---------------------------------------------------------------------------
-def separate_demucs(audio_path, output_dir, quality="alta", stems=2, device=None):
-    """Separate audio using Demucs htdemucs_ft.
+def separate_demucs(audio_path, output_dir, quality="alta", stems=2, device=None, model_name=None):
+    """Separate audio using Demucs.
 
     Args:
         audio_path: Path to the input audio file
         output_dir: Directory to save separated stems
         quality: 'rapida' (shifts=1), 'alta' (shifts=5), 'maxima' (shifts=10)
-        stems: 2 = vocals + instrumental | 4 = drums, bass, other, vocals
+        stems: 2 = vocals + instrumental | 4 = drums, bass, other, vocals | 6 = + guitar, piano
         device: Device to use (cuda/cpu/mps). Auto-detected if None.
+        model_name: Demucs model name (htdemucs_ft, htdemucs, htdemucs_6s). Auto-selected if None.
 
     Returns:
         dict with paths to separated files and metadata
@@ -65,15 +85,25 @@ def separate_demucs(audio_path, output_dir, quality="alta", stems=2, device=None
     from pathlib import Path
 
     CALIDAD = {
-        "rapida": {"shifts": 1, "overlap": 0.25},
-        "alta":   {"shifts": 5, "overlap": 0.25},
-        "maxima": {"shifts": 10, "overlap": 0.5},
+        "rapida": {"shifts": 1, "overlap": 0.25, "segment": None},
+        "alta":   {"shifts": 5, "overlap": 0.25, "segment": None},
+        "maxima": {"shifts": 10, "overlap": 0.5, "segment": None},
     }
 
     if device is None:
         device = get_device()
 
     cal = CALIDAD.get(quality, CALIDAD["alta"])
+
+    # Select model based on stem count or explicit model_name
+    if model_name and model_name in DEMUCS_MODELS:
+        chosen_model = model_name
+    elif stems >= 6:
+        chosen_model = "htdemucs_6s"
+    else:
+        chosen_model = MODELO_DEMUCS  # htdemucs_ft
+
+    model_info = DEMUCS_MODELS[chosen_model]
 
     audio_path = Path(audio_path)
     output_dir = Path(output_dir)
@@ -82,8 +112,8 @@ def separate_demucs(audio_path, output_dir, quality="alta", stems=2, device=None
     base_name = audio_path.stem
 
     # Load Demucs model
-    print(f"[separate] Loading Demucs {MODELO_DEMUCS}...", flush=True)
-    model = get_model(MODELO_DEMUCS)
+    print(f"[separate] Loading Demucs {chosen_model}...", flush=True)
+    model = get_model(chosen_model)
     model.to(device)
     model.eval()
 
@@ -105,52 +135,81 @@ def separate_demucs(audio_path, output_dir, quality="alta", stems=2, device=None
         wav = wav[:2]
 
     # Separate stems
-    print(f"[separate] Processing with {cal['shifts']} shifts...", flush=True)
+    print(f"[separate] Processing with {chosen_model}, {cal['shifts']} shifts, quality={quality}...", flush=True)
     wav_gpu = wav.unsqueeze(0).to(device)
+
+    apply_kwargs = {
+        "device": device,
+        "shifts": cal["shifts"],
+        "overlap": cal["overlap"],
+        "progress": True,
+    }
+    if cal["segment"] is not None:
+        apply_kwargs["segment"] = cal["segment"]
+
     with torch.no_grad():
-        sources = apply_model(
-            model, wav_gpu,
-            device=device,
-            shifts=cal["shifts"],
-            overlap=cal["overlap"],
-            progress=True,
-        )
-    # sources shape: [1, 4, 2, samples]
-    # Order: drums(0), bass(1), other(2), vocals(3)
+        sources = apply_model(model, wav_gpu, **apply_kwargs)
+
+    # sources shape: [1, N_stems, 2, samples]
+    # Stem order depends on model — use model_info["stem_order"]
+    stem_order = model_info["stem_order"]
+    n_model_stems = len(stem_order)
 
     result_stems = {}
 
-    # Always save vocals
-    vocals = sources[0, 3].cpu()
-    vocals_path = output_dir / f"{base_name}_vocals.wav"
-    torchaudio.save(str(vocals_path), vocals, sr, bits_per_sample=32)
-    result_stems["vocals"] = str(vocals_path)
-    print(f"[separate] Saved vocals: {vocals_path}", flush=True)
-
-    if stems >= 4:
-        # Save individual stems
-        stem_names = ["drums", "bass", "other"]
-        for idx, name in enumerate(stem_names):
-            stem = sources[0, idx].cpu()
-            stem_path = output_dir / f"{base_name}_{name}.wav"
-            torchaudio.save(str(stem_path), stem, sr, bits_per_sample=32)
-            result_stems[name] = str(stem_path)
-            print(f"[separate] Saved {name}: {stem_path}", flush=True)
+    if stems >= n_model_stems:
+        # Save all individual stems the model produces
+        for idx, name in enumerate(stem_order):
+            if idx < sources.shape[1]:
+                stem_audio = sources[0, idx].cpu()
+                stem_path = output_dir / f"{base_name}_{name}.wav"
+                torchaudio.save(str(stem_path), stem_audio, sr, bits_per_sample=32)
+                result_stems[name] = str(stem_path)
+                print(f"[separate] Saved {name}: {stem_path}", flush=True)
+    elif stems >= 4 and n_model_stems >= 4:
+        # Save the standard 4 stems (drums, bass, other, vocals)
+        # If model has more stems (6s), merge guitar+piano into 'other'
+        for idx, name in enumerate(stem_order[:4]):
+            if idx < sources.shape[1]:
+                stem_audio = sources[0, idx].cpu()
+                # For the 'other' stem in a 6s model, also add guitar + piano
+                if name == "other" and n_model_stems > 4:
+                    for extra_idx in range(4, n_model_stems):
+                        if extra_idx < sources.shape[1]:
+                            stem_audio = stem_audio + sources[0, extra_idx].cpu()
+                stem_path = output_dir / f"{base_name}_{name}.wav"
+                torchaudio.save(str(stem_path), stem_audio, sr, bits_per_sample=32)
+                result_stems[name] = str(stem_path)
+                print(f"[separate] Saved {name}: {stem_path}", flush=True)
     else:
-        # Mix drums + bass + other into instrumental
-        instrumental = sources[0, 0].cpu() + sources[0, 1].cpu() + sources[0, 2].cpu()
-        instrumental_path = output_dir / f"{base_name}_instrumental.wav"
-        torchaudio.save(str(instrumental_path), instrumental, sr, bits_per_sample=32)
-        result_stems["instrumental"] = str(instrumental_path)
-        print(f"[separate] Saved instrumental: {instrumental_path}", flush=True)
+        # 2-stem: vocals + instrumental (mix everything except vocals)
+        vocals_idx = stem_order.index("vocals")
+        vocals = sources[0, vocals_idx].cpu()
+        vocals_path = output_dir / f"{base_name}_vocals.wav"
+        torchaudio.save(str(vocals_path), vocals, sr, bits_per_sample=32)
+        result_stems["vocals"] = str(vocals_path)
+        print(f"[separate] Saved vocals: {vocals_path}", flush=True)
+
+        # Mix all non-vocal stems into instrumental
+        instrumental = None
+        for idx in range(sources.shape[1]):
+            if idx != vocals_idx:
+                s = sources[0, idx].cpu()
+                instrumental = s if instrumental is None else instrumental + s
+        if instrumental is not None:
+            instrumental_path = output_dir / f"{base_name}_instrumental.wav"
+            torchaudio.save(str(instrumental_path), instrumental, sr, bits_per_sample=32)
+            result_stems["instrumental"] = str(instrumental_path)
+            print(f"[separate] Saved instrumental: {instrumental_path}", flush=True)
 
     # Cleanup GPU memory
-    del sources, wav_gpu, vocals, model
+    del sources, wav_gpu, model
     torch.cuda.empty_cache()
 
     return {
         "success": True,
         "backend": "demucs",
+        "model": chosen_model,
         "stems": result_stems,
         "stem_count": len(result_stems),
         "duration": round(duration_sec, 2),
@@ -323,10 +382,12 @@ def separate_uvr(audio_path, output_dir, model_name=None, stems=2, device=None):
 #  LIST AVAILABLE MODELS
 # ---------------------------------------------------------------------------
 def list_models():
-    """Return available UVR model presets."""
+    """Return available model presets (Demucs + UVR)."""
     models = []
+    for name, info in DEMUCS_MODELS.items():
+        models.append({"name": name, "backend": "demucs", "description": info["description"], "stems": info["max_stems"]})
     for name, info in UVR_MODELS.items():
-        models.append({"name": name, "description": info["description"], "stems": info["stems"]})
+        models.append({"name": name, "backend": "uvr", "description": info["description"], "stems": info["stems"]})
     return models
 
 
@@ -342,9 +403,9 @@ def main():
     parser.add_argument("--quality", type=str, default="alta", choices=["rapida", "alta", "maxima"],
                         help="Demucs quality: rapida(shifts=1), alta(shifts=5), maxima(shifts=10)")
     parser.add_argument("--model", type=str, default=None,
-                        help="UVR model name (default: UVR-MDX-NET-Inst_HQ_3)")
-    parser.add_argument("--stems", type=int, default=2, choices=[2, 4],
-                        help="Number of stems: 2 (vocal+inst) or 4 (drums+bass+other+vocals)")
+                        help="Model name. Demucs: htdemucs_ft/htdemucs/htdemucs_6s. UVR: see --list-models")
+    parser.add_argument("--stems", type=int, default=2, choices=[2, 4, 6],
+                        help="Number of stems: 2 (vocal+inst), 4 (drums+bass+other+vocals), 6 (+ guitar+piano)")
     parser.add_argument("--device", type=str, default=None,
                         help="Device (cuda/cpu/mps). Auto-detected if omitted.")
     parser.add_argument("--json", action="store_true", help="Output as JSON")
@@ -397,6 +458,7 @@ def main():
                 quality=args.quality,
                 stems=args.stems,
                 device=args.device,
+                model_name=args.model,
             )
 
         elapsed = time.time() - start_time

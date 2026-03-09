@@ -1366,14 +1366,16 @@ router.post('/separate-stems', authMiddleware, async (req: AuthenticatedRequest,
     const safeQuality = validQualities.includes(quality) ? quality : 'alta';
     const validBackends = ['demucs', 'uvr'];
     const safeBackend = validBackends.includes(backend) ? backend : 'demucs';
-    const safeStems = [2, 4].includes(Number(stems)) ? Number(stems) : 2;
+    const safeStems = [2, 4, 6].includes(Number(stems)) ? Number(stems) : 2;
 
     // --- Cache check: skip re-processing if stems already exist ---
     const baseName = path.basename(resolvedAudio, path.extname(resolvedAudio));
     const cachePrefix = `${baseName}_`;
-    const expectedStems = safeStems >= 4
-      ? ['vocals', 'drums', 'bass', 'other']
-      : ['vocals', 'instrumental'];
+    const expectedStems = safeStems >= 6
+      ? ['vocals', 'drums', 'bass', 'other', 'guitar', 'piano']
+      : safeStems >= 4
+        ? ['vocals', 'drums', 'bass', 'other']
+        : ['vocals', 'instrumental'];
     const cachedEntries: Record<string, { url: string; path: string; filename: string }> = {};
     let allCached = true;
     for (const stemName of expectedStems) {
@@ -1419,8 +1421,8 @@ router.post('/separate-stems', authMiddleware, async (req: AuthenticatedRequest,
       '--json',
     ];
 
-    // Add model flag for UVR backend
-    if (safeBackend === 'uvr' && model && typeof model === 'string') {
+    // Add model flag for UVR or Demucs backend
+    if (model && typeof model === 'string') {
       pyArgs.push('--model', model);
     }
 
@@ -1514,11 +1516,16 @@ router.post('/separate-stems', authMiddleware, async (req: AuthenticatedRequest,
 router.get('/separator-models', authMiddleware, async (_req: AuthenticatedRequest, res: Response) => {
   try {
     const models = [
-      { name: 'UVR-MDX-NET-Inst_HQ_3', description: 'MDX-Net Inst HQ 3 — best overall', stems: 2 },
-      { name: 'UVR-MDX-NET-Voc_FT', description: 'MDX-Net Vocal FT — vocal-focused', stems: 2 },
-      { name: 'UVR_MDXNET_KARA_2', description: 'MDX-Net Karaoke 2 — karaoke-grade', stems: 2 },
-      { name: 'Kim_Vocal_2', description: 'Kim Vocal 2 — popular vocal extraction', stems: 2 },
-      { name: 'UVR-MDX-NET-Inst_3', description: 'MDX-Net Inst 3 — clean instrumental', stems: 2 },
+      // Demucs models
+      { name: 'htdemucs_ft', backend: 'demucs', description: 'HTDemucs Fine-Tuned — best quality 4-stem', stems: 4 },
+      { name: 'htdemucs', backend: 'demucs', description: 'HTDemucs — fast 4-stem', stems: 4 },
+      { name: 'htdemucs_6s', backend: 'demucs', description: 'HTDemucs 6-Stem — guitar & piano separation', stems: 6 },
+      // UVR models
+      { name: 'UVR-MDX-NET-Inst_HQ_3', backend: 'uvr', description: 'MDX-Net Inst HQ 3 — best overall', stems: 2 },
+      { name: 'UVR-MDX-NET-Voc_FT', backend: 'uvr', description: 'MDX-Net Vocal FT — vocal-focused', stems: 2 },
+      { name: 'UVR_MDXNET_KARA_2', backend: 'uvr', description: 'MDX-Net Karaoke 2 — karaoke-grade', stems: 2 },
+      { name: 'Kim_Vocal_2', backend: 'uvr', description: 'Kim Vocal 2 — popular vocal extraction', stems: 2 },
+      { name: 'UVR-MDX-NET-Inst_3', backend: 'uvr', description: 'MDX-Net Inst 3 — clean instrumental', stems: 2 },
     ];
     res.json({ models });
   } catch (error) {
